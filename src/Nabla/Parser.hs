@@ -11,7 +11,7 @@ import Nabla.AST
 type Parser = Parsec Void String
 
 ast :: Parser AST
-ast = AST <$> (sc *> many (expr <* some newlineT) <* eof)
+ast = AST <$> (scn *> many (expr <* some newlineT) <* eof)
 
 expr :: Parser Expr
 expr = ValueExpr <$> value
@@ -41,6 +41,12 @@ symbolT = L.lexeme sc (char ':' *> some alphaNumChar)
 
 newlineT :: Parser String
 newlineT = L.lexeme sc $ (:[]) <$> newline
+
+scn :: Parser ()
+scn = L.space
+  space1
+  (L.skipLineComment "//")
+  (L.skipBlockComment "/*" "*/")
 
 sc :: Parser ()
 sc = L.space
