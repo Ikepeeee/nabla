@@ -17,13 +17,18 @@ expr :: Parser Expr
 expr = ValueExpr <$> value
 
 value :: Parser Value
-value = SimpleV <$> simpleValue
+value
+  = SimpleV <$> simpleValue
+  <|> ComplexV <$> complexValue
 
 simpleValue :: Parser SimpleValue
 simpleValue
   = NumberV <$> numberT
   <|> StringV <$> stringT
   <|> SymbolV <$> symbolT
+
+complexValue :: Parser ComplexValue
+complexValue = WrapValues <$> contextT <*> many value
 
 numberT :: Parser String
 numberT = try (show <$> floatT) <|> (show <$> intT)
@@ -41,6 +46,9 @@ symbolT = L.lexeme sc (char ':' *> some alphaNumChar)
 
 newlineT :: Parser String
 newlineT = L.lexeme sc $ (:[]) <$> newline
+
+contextT :: Parser String
+contextT = L.lexeme sc $ (:) <$> upperChar <*> many alphaNumChar
 
 scn :: Parser ()
 scn = L.space

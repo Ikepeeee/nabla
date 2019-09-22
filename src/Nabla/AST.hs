@@ -12,16 +12,28 @@ data Expr = ValueExpr Value deriving (Eq)
 instance Show Expr where
   show (ValueExpr v) = show v
 
-data Value = SimpleV SimpleValue deriving (Eq)
+data Value
+  = SimpleV SimpleValue
+  | ComplexV ComplexValue
+  deriving (Eq)
 
 instance Show Value where
   show (SimpleV v) = show v
+  show (ComplexV v) = show v
 
 data SimpleValue
   = NumberV String
   | StringV String
   | SymbolV String
   deriving (Eq)
+
+type Context = String
+data ComplexValue = WrapValues Context [Value] deriving (Eq)
+
+instance Show ComplexValue where
+  show (WrapValues s vs) = s <> " " <> vs'
+    where
+      vs' = unwords $ map show vs
 
 instance Show SimpleValue where
   show (NumberV v) = v
