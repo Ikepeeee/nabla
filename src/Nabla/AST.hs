@@ -39,5 +39,6 @@ instance Show ComplexValue where
       showChild v = "(" <> show v <> ")"
 
 instance Show SimpleValue where
+  show (NumberV v) = v
   show (StringV v) = "'" <> v <> "'"
   show (SymbolV v) = ":" <> v
