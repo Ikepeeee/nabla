@@ -69,4 +69,15 @@ complexValueTest =
           ]
         )
       ]
+  , "complex" ~: parse ast "" "List (Just 'a') (Just 'b')\n" ~?=
+    complexV "List"
+      [ ComplexV (WrapValues "Just"
+          [ SimpleV (StringV "a")
+          ]
+        )
+      , ComplexV (WrapValues "Just"
+          [ SimpleV (StringV "b")
+          ]
+        )
+      ]
   ]

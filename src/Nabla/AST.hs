@@ -33,9 +33,11 @@ data ComplexValue = WrapValues Context [Value] deriving (Eq)
 instance Show ComplexValue where
   show (WrapValues s vs) = s <> " " <> vs'
     where
-      vs' = unwords $ map show vs
+      vs' = unwords $ map showChild vs
+      showChild (SimpleV v) = show v
+      showChild (ComplexV (WrapValues context [])) = context
+      showChild v = "(" <> show v <> ")"
 
 instance Show SimpleValue where
-  show (NumberV v) = v
   show (StringV v) = "'" <> v <> "'"
   show (SymbolV v) = ":" <> v

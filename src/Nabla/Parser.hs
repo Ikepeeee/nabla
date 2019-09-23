@@ -20,6 +20,7 @@ value :: Parser Value
 value
   = SimpleV <$> simpleValue
   <|> ComplexV <$> complexValue
+  <|> (leftT *> value <* rightT)
 
 simpleValue :: Parser SimpleValue
 simpleValue
@@ -49,6 +50,12 @@ newlineT = L.lexeme sc $ (:[]) <$> newline
 
 contextT :: Parser String
 contextT = L.lexeme sc $ (:) <$> upperChar <*> many alphaNumChar
+
+leftT :: Parser String
+leftT = L.lexeme sc $ string "("
+
+rightT :: Parser String
+rightT = L.lexeme sc $ string ")"
 
 scn :: Parser ()
 scn = L.space
