@@ -7,10 +7,18 @@ newtype AST = AST [Expr] deriving (Eq)
 instance Show AST where
   show (AST exprs) = intercalate "\n" $ map show exprs
 
-data Expr = ValueExpr Value deriving (Eq)
+data Expr
+  = ValueExpr Value
+  | VariableExpr Identifier
+  | Assign Identifier Expr
+  deriving (Eq)
+
+type Identifier = String
 
 instance Show Expr where
   show (ValueExpr v) = show v
+  show (VariableExpr name) = name
+  show (Assign name v) = name <> " = " <> show v
 
 data Value
   = SimpleV SimpleValue
