@@ -21,6 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- mtl == 2.2.2
 - megaparsec == 7.0.5
 - haskeline == 0.7.5.0
 - HUnit == 1.6.0.0
