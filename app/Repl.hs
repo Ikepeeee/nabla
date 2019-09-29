@@ -10,6 +10,7 @@ import Control.Monad.Except
 import Data.List (intercalate)
 import System.Exit (exitSuccess, exitFailure)
 import Text.Megaparsec (parse)
+import Text.Megaparsec.Error (errorBundlePretty)
 import Nabla.Parser (ast)
 import Nabla.Executor (exec, Var, runExecutor)
 import System.Console.Haskeline
@@ -48,7 +49,7 @@ replOneExpr line = do
   vars <- get
   ast <- case astParse line of
     Right ast -> return ast
-    Left e -> throwError $ show e
+    Left e -> throwError $ errorBundlePretty e
   (vs, vars') <- case runExecutor (exec ast) vars of
     Right res -> return res
     Left e -> throwError e
