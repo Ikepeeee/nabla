@@ -75,3 +75,41 @@ complexValueTest =
         )
       ]
   ]
+
+variableExprTest =
+  [ "assign" ~: parse ast "" "a\n" ~?=
+    Right (AST [(VariableExpr "a")])
+  , "assign" ~: parse ast "" "a1\n" ~?=
+    Right (AST [(VariableExpr "a1")])
+  , "assign" ~: parse ast "" "aA\n" ~?=
+    Right (AST [(VariableExpr "aA")])
+  , "assign" ~: parse ast "" "a1A\n" ~?=
+    Right (AST [(VariableExpr "a1A")])
+  ]
+
+assignExprTest =
+  [ "assign" ~: parse ast "" "a = 1\n" ~?= Right
+    (AST [
+      (Assign "a"
+        (ValueExpr
+          (SimpleV (NumberV "1"))
+        )
+      )
+    ])
+  , "assign" ~: parse ast "" "a = Just 1\n" ~?= Right
+    (AST [
+      (Assign "a"
+        (ValueExpr
+          (ComplexV
+            (WrapValues "Just" [SimpleV (NumberV "1")])
+          )
+        )
+      )
+    ])
+  , "assign" ~: parse ast "" "a = b\n" ~?= Right
+    (AST [
+      (Assign "a"
+        (VariableExpr "b")
+      )
+    ])
+  ]
