@@ -43,7 +43,10 @@ numberT = try (show <$> floatT) <|> (show <$> intT)
     floatT = L.signed sc $ L.lexeme sc L.float
 
 stringT :: Parser String
-stringT = L.lexeme sc (char '\'' *> manyTill L.charLiteral (char '\''))
+stringT = L.lexeme sc $ (str '\'') <|> (str '"') <|> (str '`')
+  where
+    str :: Char -> Parser String
+    str c = char c *> manyTill L.charLiteral (char c)
 
 symbolT :: Parser String
 symbolT = L.lexeme sc (char ':' *> some alphaNumChar)
