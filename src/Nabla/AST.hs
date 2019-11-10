@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Nabla.AST where
 
 import Data.List (intercalate)
@@ -11,6 +13,7 @@ data Expr
   = ValueExpr Value
   | VariableExpr Identifier
   | Assign Identifier Expr
+  | Complex (ComplexValue Expr)
   deriving (Eq)
 
 type Identifier = String
@@ -19,10 +22,11 @@ instance Show Expr where
   show (ValueExpr v) = show v
   show (VariableExpr name) = name
   show (Assign name v) = name <> " = " <> show v
+  show (Complex c) = show c
 
 data Value
   = SimpleV SimpleValue
-  | ComplexV ComplexValue
+  | ComplexV (ComplexValue Value)
   deriving (Eq)
 
 instance Show Value where
@@ -36,14 +40,20 @@ data SimpleValue
   deriving (Eq)
 
 type Context = String
-data ComplexValue = WrapValues Context [Value] deriving (Eq)
+data ComplexValue v = WrapValues Context [v] deriving (Eq)
 
-instance Show ComplexValue where
+instance Show (ComplexValue Value) where
   show (WrapValues s vs) = s <> " " <> vs'
     where
       vs' = unwords $ map showChild vs
       showChild (SimpleV v) = show v
       showChild (ComplexV (WrapValues context [])) = context
+      showChild v = "(" <> show v <> ")"
+
+instance Show (ComplexValue Expr) where
+  show (WrapValues s vs) = s <> " " <> vs'
+    where
+      vs' = unwords $ map showChild vs
       showChild v = "(" <> show v <> ")"
 
 instance Show SimpleValue where
