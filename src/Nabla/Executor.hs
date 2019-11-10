@@ -34,3 +34,9 @@ eval (Assign name v) = do
   v' <- eval v
   put $ (name, v'):vars
   return v'
+eval (Complex (WrapValues c exprs)) = do
+  vs <- evalMany exprs
+  return $ ComplexV $ WrapValues c vs
+  where
+    evalMany [] = pure []
+    evalMany (e:es) = (:) <$> (eval e) <*> (evalMany es)
