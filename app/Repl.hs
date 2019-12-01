@@ -12,9 +12,9 @@ import System.Exit (exitSuccess, exitFailure)
 import Text.Megaparsec (parse)
 import Text.Megaparsec.Error (errorBundlePretty)
 import Nabla.Parser (ast)
-import Nabla.Executor (exec, Var, runExecutor)
+import Nabla.Executor (exec, runExecutor)
 import System.Console.Haskeline
-import Nabla.AST
+import Nabla.IST (Var, Value)
 
 main :: IO ()
 main = repl []

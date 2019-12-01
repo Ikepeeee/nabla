@@ -17,7 +17,6 @@ expr :: Parser Expr
 expr
   = try (Assign <$> identifierT <*> (assignT *> expr))
   <|> VariableExpr <$> identifierT
-  <|> Complex <$> (WrapValues <$> contextT <*> many expr)
   <|> ValueExpr <$> value
 
 value :: Parser Value
@@ -32,8 +31,8 @@ simpleValue
   <|> StringV <$> stringT
   <|> SymbolV <$> symbolT
 
-complexValue :: Parser (ComplexValue Value)
-complexValue = WrapValues <$> contextT <*> many value
+complexValue :: Parser ComplexValue
+complexValue = WrapValues <$> contextT <*> many expr
 
 numberT :: Parser String
 numberT = try (show <$> floatT) <|> (show <$> intT)

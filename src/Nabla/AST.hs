@@ -13,7 +13,6 @@ data Expr
   = ValueExpr Value
   | VariableExpr Identifier
   | Assign Identifier Expr
-  | Complex (ComplexValue Expr)
   deriving (Eq)
 
 type Identifier = String
@@ -22,11 +21,10 @@ instance Show Expr where
   show (ValueExpr v) = show v
   show (VariableExpr name) = name
   show (Assign name v) = name <> " = " <> show v
-  show (Complex c) = show c
 
 data Value
   = SimpleV SimpleValue
-  | ComplexV (ComplexValue Value)
+  | ComplexV ComplexValue
   deriving (Eq)
 
 instance Show Value where
@@ -40,17 +38,9 @@ data SimpleValue
   deriving (Eq)
 
 type Context = String
-data ComplexValue v = WrapValues Context [v] deriving (Eq)
+data ComplexValue = WrapValues Context [Expr] deriving (Eq)
 
-instance Show (ComplexValue Value) where
-  show (WrapValues s vs) = s <> " " <> vs'
-    where
-      vs' = unwords $ map showChild vs
-      showChild (SimpleV v) = show v
-      showChild (ComplexV (WrapValues context [])) = context
-      showChild v = "(" <> show v <> ")"
-
-instance Show (ComplexValue Expr) where
+instance Show ComplexValue where
   show (WrapValues s vs) = s <> " " <> vs'
     where
       vs' = unwords $ map showChild vs
