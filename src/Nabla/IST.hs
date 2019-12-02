@@ -10,9 +10,9 @@ data Value
   | ComplexV Context [Value]
 
 instance Show Value where
-    show (NumberV v) = v
-    show (StringV v) = "'" <> v <> "'"
-    show (SymbolV v) = ":" <> v
-    show (ComplexV c vs) = c <> " " <> unwords (map show vs)
+  show (NumberV v) = v
+  show (StringV v) = "'" <> v <> "'"
+  show (SymbolV v) = ":" <> v
+  show (ComplexV c vs) = c <> " " <> unwords (map show vs)
 
 type Context = String
