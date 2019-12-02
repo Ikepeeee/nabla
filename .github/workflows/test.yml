@@ -3,7 +3,7 @@ name: Test
 on: [push]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
 
@@ -16,5 +16,5 @@ jobs:
     - uses: mstksg/setup-stack@v1
     - name: Build
       run: stack build
-    - name: Run tests
+    - name: Test
       run: stack test
