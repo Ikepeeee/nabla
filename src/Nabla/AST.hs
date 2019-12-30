@@ -12,15 +12,24 @@ instance Show AST where
 data Expr
   = ValueExpr Value
   | VariableExpr Identifier
+  | TypeAssign Identifier TypeExpr
   | Assign Identifier Expr
   deriving (Eq)
 
 type Identifier = String
 
+data TypeExpr
+  = TypeName Identifier
+  deriving (Eq)
+
+instance Show TypeExpr where
+  show (TypeName name) = name
+
 instance Show Expr where
   show (ValueExpr v) = show v
   show (VariableExpr name) = name
   show (Assign name v) = name <> " = " <> show v
+  show (TypeAssign name t) = name <> " :: " <> show t
 
 data Value
   = SimpleV SimpleValue

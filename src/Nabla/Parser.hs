@@ -15,9 +15,13 @@ ast = AST <$> (scn *> many (expr <* some newlineT) <* eof)
 
 expr :: Parser Expr
 expr
-  = try (Assign <$> identifierT <*> (assignT *> expr))
+  = try (TypeAssign <$> identifierT <*> (typeAssignT *> typeExpr))
+  <|> try (Assign <$> identifierT <*> (assignT *> expr))
   <|> VariableExpr <$> identifierT
   <|> ValueExpr <$> value
+
+typeExpr :: Parser TypeExpr
+typeExpr = TypeName <$> identifierT
 
 value :: Parser Value
 value
@@ -65,6 +69,9 @@ rightT = L.lexeme sc $ string ")"
 
 assignT :: Parser String
 assignT = L.lexeme sc $ string "="
+
+typeAssignT :: Parser String
+typeAssignT = L.lexeme sc $ string "::"
 
 identifierT :: Parser String
 identifierT = L.lexeme sc $ (:) <$> lowerChar <*> many alphaNumChar

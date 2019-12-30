@@ -12,20 +12,21 @@ import System.Exit (exitSuccess, exitFailure)
 import Text.Megaparsec (parse)
 import Text.Megaparsec.Error (errorBundlePretty)
 import Nabla.Parser (ast)
-import Nabla.Executor (exec, runExecutor)
+import Nabla.Executor (exec, runExecutor, ValueState(ValueState))
 import System.Console.Haskeline
-import Nabla.IST (Var, Value)
+import Nabla.IST (Value)
+import Nabla.Fixture (typeVars)
 
 main :: IO ()
-main = repl []
+main = repl $ ValueState [] typeVars []
 
-newtype REPL a = REPL (StateT [Var] (ExceptT String IO) a)
-  deriving (Functor, Applicative, Monad, MonadState [Var], MonadError String)
+newtype REPL a = REPL (StateT ValueState (ExceptT String IO) a)
+  deriving (Functor, Applicative, Monad, MonadState ValueState, MonadError String)
 
-runREPL :: REPL a -> [Var] -> IO (Either String (a, [Var]))
+runREPL :: REPL a -> ValueState -> IO (Either String (a, ValueState))
 runREPL (REPL repl) vars = runExceptT (runStateT repl vars)
 
-repl :: [Var] -> IO ()
+repl :: ValueState -> IO ()
 repl vars = runInputT defaultSettings (repl' vars)
   where
     repl' vars = do
@@ -46,14 +47,14 @@ repl vars = runInputT defaultSettings (repl' vars)
 
 replOneExpr :: String -> REPL [Value]
 replOneExpr line = do
-  vars <- get
+  state <- get
   ast <- case astParse line of
     Right ast -> return ast
     Left e -> throwError $ errorBundlePretty e
-  (vs, vars') <- case runExecutor (exec ast) vars of
+  (vs, state) <- case runExecutor (exec ast) state of
     Right res -> return res
     Left e -> throwError e
-  put $ vars ++ vars'
+  put state
   return vs
 
 astParse line = parse ast "repl" (line <> "\n")
