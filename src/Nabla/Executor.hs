@@ -5,21 +5,22 @@ module Nabla.Executor where
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Except
+import Data.List (find, intercalate)
 import qualified Nabla.AST as AST
 import qualified Nabla.IST as IST
 
 data ValueState = ValueState {
   vars :: [IST.Var],
-  types :: [IST.TypeVar],
-  typedVars :: [IST.TypedVar]
+  types :: [IST.Type],
+  signatures :: [IST.Signature]
 }
 
 addVars :: IST.Var -> ValueState -> ValueState
-addVars v vs = ValueState (v:(vars vs)) (types vs) (typedVars vs)
-addTypes :: IST.TypeVar -> ValueState -> ValueState
-addTypes tv vs = ValueState (vars vs) (tv:(types vs)) (typedVars vs)
-addTypedVars :: IST.TypedVar -> ValueState -> ValueState
-addTypedVars tv vs = ValueState (vars vs) (types vs) (tv:(typedVars vs))
+addVars v vs = ValueState (v:(vars vs)) (types vs) (signatures vs)
+addTypes :: IST.Type -> ValueState -> ValueState
+addTypes tv vs = ValueState (vars vs) (tv:(types vs)) (signatures vs)
+addTypedVars :: IST.Signature -> ValueState -> ValueState
+addTypedVars tv vs = ValueState (vars vs) (types vs) (tv:(signatures vs))
 
 newtype Executor a = Executor (StateT ValueState (ExceptT String Identity) a)
   deriving (Functor, Applicative, Monad, MonadState ValueState, MonadError String)
@@ -47,20 +48,20 @@ eval (AST.Assign name v) = do
     Just _ -> throwError $ name <> " is already assign."
     Nothing -> return v
   v' <- eval v
-  case lookup name (typedVars vs) of
-    Just ts -> case all (\t -> t v') ts of
-      True -> return ()
-      False -> throwError $ name <> " can't be assign because of type error."
+  case lookup name (signatures vs) of
+    Just ts -> case IST.infer v' ts of
+      [] -> throwError $ name <> " should be " <> intercalate " | " (map IST.typeName ts)
+      _ -> return ()
     Nothing -> return ()
   modify $ addVars (name, v')
-  modify $ addTypedVars (name, IST.infer v' (map snd (types vs)))
+  modify $ addTypedVars (name, IST.infer v' (types vs))
   return v'
 eval (AST.TypeAssign name (AST.TypeName t)) = do
   vs <- get
-  case lookup name (typedVars vs) of
+  case lookup name (signatures vs) of
     Just _ -> throwError $ name <> " is already defined."
     Nothing -> return ()
-  case lookup t (types vs) of
+  case find (\(IST.Type n _) -> n == t) (types vs) of
     Just tp -> modify $ addTypedVars (name, [tp])
     Nothing -> throwError $ t <> " is not defined."
   return $ IST.ComplexV "Nothing" []

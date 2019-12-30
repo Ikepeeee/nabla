@@ -2,8 +2,11 @@ module Nabla.IST where
 
 type Identifier = String
 type Var = (Identifier, Value)
-type TypedVar = (Identifier, [Type])
-type TypeVar = (Identifier, Type)
+type Signature = (Identifier, [Type])
+data Type = Type
+  { typeName :: Identifier
+  , typeSieve :: (Value -> Bool)
+  }
 
 type TypedValue = (Value, [Type])
 
@@ -21,7 +24,5 @@ instance Show Value where
 
 type Context = String
 
-type Type = Value -> Bool
-
 infer :: Value -> [Type] -> [Type]
-infer v ts = filter (\t -> t v) ts
+infer v = filter (\(Type _ t) -> t v)
