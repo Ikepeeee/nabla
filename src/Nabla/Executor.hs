@@ -30,7 +30,8 @@ runExecutor (Executor exec) vars = runIdentity (runExceptT (runStateT exec vars)
 
 exec :: AST.AST -> Executor [IST.Value]
 exec (AST.AST []) = return []
-exec (AST.AST (expr:exprs)) = (:) <$> (eval expr) <*> exec (AST.AST exprs)
+exec (AST.AST ((AST.ExprUnit expr):units)) = (:) <$> (eval expr) <*> exec (AST.AST units)
+exec (AST.AST ((AST.StatUnit s):units)) = (stat s) *> exec (AST.AST units)
 
 eval :: AST.Expr -> Executor IST.Value
 eval (AST.ValueExpr (AST.SimpleV (AST.StringV v))) = pure (IST.StringV v)
@@ -56,7 +57,9 @@ eval (AST.Assign name v) = do
   modify $ addVars (name, v')
   modify $ addTypedVars (name, IST.infer v' (types vs))
   return v'
-eval (AST.TypeAssign name (AST.TypeName t)) = do
+
+stat :: AST.Stat -> Executor ()
+stat (AST.TypeAssign name (AST.TypeName t)) = do
   vs <- get
   case lookup name (signatures vs) of
     Just _ -> throwError $ name <> " is already defined."
@@ -64,4 +67,4 @@ eval (AST.TypeAssign name (AST.TypeName t)) = do
   case find (\(IST.Type n _) -> n == t) (types vs) of
     Just tp -> modify $ addTypedVars (name, [tp])
     Nothing -> throwError $ t <> " is not defined."
-  return $ IST.ComplexV "Nothing" []
+  return ()

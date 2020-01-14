@@ -11,12 +11,17 @@ import Nabla.AST
 type Parser = Parsec Void String
 
 ast :: Parser AST
-ast = AST <$> (scn *> many (expr <* some newlineT) <* eof)
+ast = AST <$> (scn *> many (unit <* some newlineT) <* eof)
+
+unit :: Parser Unit
+unit = try (StatUnit <$> stat) <|> (ExprUnit <$> expr)
+
+stat :: Parser Stat
+stat = TypeAssign <$> identifierT <*> (typeAssignT *> typeExpr)
 
 expr :: Parser Expr
 expr
-  = try (TypeAssign <$> identifierT <*> (typeAssignT *> typeExpr))
-  <|> try (Assign <$> identifierT <*> (assignT *> expr))
+  = try (Assign <$> identifierT <*> (assignT *> expr))
   <|> VariableExpr <$> identifierT
   <|> ValueExpr <$> value
 
