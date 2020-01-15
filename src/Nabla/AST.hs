@@ -4,10 +4,24 @@ module Nabla.AST where
 
 import Data.List (intercalate)
 
-newtype AST = AST [Expr] deriving (Eq)
+data AST = AST [Unit] deriving (Eq)
 
 instance Show AST where
-  show (AST exprs) = intercalate "\n" $ map show exprs
+  show (AST units) = intercalate "\n" $ map show units
+
+data Unit
+  = ExprUnit Expr
+  | StatUnit Stat
+  deriving (Eq)
+
+instance Show Unit where
+  show (ExprUnit e) = show e
+  show (StatUnit s) = show s
+
+data Stat = TypeAssign Identifier TypeExpr deriving (Eq)
+
+instance Show Stat where
+  show (TypeAssign name t) = name <> " :: " <> (show t)
 
 data Expr
   = ValueExpr Value
@@ -16,6 +30,13 @@ data Expr
   deriving (Eq)
 
 type Identifier = String
+
+data TypeExpr
+  = TypeName Identifier
+  deriving (Eq)
+
+instance Show TypeExpr where
+  show (TypeName name) = name
 
 instance Show Expr where
   show (ValueExpr v) = show v
