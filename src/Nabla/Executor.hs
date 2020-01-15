@@ -41,17 +41,17 @@ eval (AST.ValueExpr (AST.ComplexV (AST.WrapValues c es))) = IST.ComplexV c <$> (
 eval (AST.VariableExpr name) = do
   vs <- get
   case lookup name (vars vs) of
-    Nothing -> throwError $ name <> " is not assign yet."
+    Nothing -> throwError $ unwords ["Error:", name, "is not assign yet."]
     Just v -> return v
 eval (AST.Assign name v) = do
   vs <- get
   case lookup name (vars vs) of
-    Just _ -> throwError $ name <> " is already assign."
+    Just _ -> throwError $ unwords ["Error:", name, " is already assign."]
     Nothing -> return v
   v' <- eval v
   case lookup name (signatures vs) of
     Just ts -> case IST.infer v' ts of
-      [] -> throwError $ name <> " should be " <> intercalate " | " (map IST.typeName ts)
+      [] -> throwError $ unwords ["Error:", name, "should be", intercalate " | " (map IST.typeName ts)]
       _ -> return ()
     Nothing -> return ()
   modify $ addVars (name, v')
@@ -62,9 +62,9 @@ stat :: AST.Stat -> Executor ()
 stat (AST.TypeAssign name (AST.TypeName t)) = do
   vs <- get
   case lookup name (signatures vs) of
-    Just _ -> throwError $ name <> " is already defined."
+    Just _ -> throwError $ unwords ["Error: variable", name, "is already typed."]
     Nothing -> return ()
   case find (\(IST.Type n _) -> n == t) (types vs) of
     Just tp -> modify $ addTypedVars (name, [tp])
-    Nothing -> throwError $ t <> " is not defined."
+    Nothing -> throwError $ unwords ["Error: type", t, "is not defined."]
   return ()
