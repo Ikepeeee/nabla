@@ -1,10 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Language.Nabla.TypeChecker where
 
-import Data.List (find)
-import qualified Data.Map (Map)
-import Data.Maybe (fromJust, isNothing)
 import Language.Nabla.AST
 import Data.SBV
 import Control.Concurrent.Async
@@ -13,12 +12,38 @@ class TypeInference a where
   infer :: a -> [Type p]
 
 class TypeCheck a where
-  valid ::  a -> [(Identifier p, FnType p)] -> Either (String, p) ()
+  valid :: a p -> [NamedFnType p] -> Either (TypeValidationError p) ()
 
-findByName :: Identifier p -> [(Identifier p, a)] -> Either (String, p) a
-findByName (Identifier p name) types = case lookup (Identifier p name) types of
+data TypeValidationError p = NameNotFound (Identifier p)
+
+getPos :: TypeValidationError p -> p
+getPos (NameNotFound (Identifier p _)) = p
+
+instance Show (TypeValidationError p) where
+  show (NameNotFound name) = "name '" <> show name <> "' is not defined"
+
+instance TypeCheck Prog where
+  valid (Prog (u:us)) ts = valid u ts *> valid (Prog us) ts
+  valid (Prog []) _ = Right ()
+
+instance TypeCheck Unit where
+  valid (UnitFnDef e) = valid e
+  valid (UnitFnType e) = valid e
+  valid (UnitTypeDef e) = valid e
+
+instance TypeCheck NamedFnDef where
+  valid (NamedFnDef name _) _ = Left $ NameNotFound name
+
+instance TypeCheck NamedFnType where
+  valid (NamedFnType name _) _ = Left $ NameNotFound name
+
+instance TypeCheck NamedTypeDef where
+  valid (NamedTypeDef name _) _ = Left $ NameNotFound name
+
+findByName :: Identifier p -> [(Identifier p, a)] -> Either (TypeValidationError p) a
+findByName name types = case lookup name types of
   Just a -> Right a
-  Nothing -> Left ("name '" <> name <> "' is not defined", p)
+  Nothing -> Left $ NameNotFound name
 
 -- instance TypeCheck (Expr p) where
 --   valid (Expr p v vs) types =
