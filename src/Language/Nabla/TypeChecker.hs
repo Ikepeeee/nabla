@@ -7,7 +7,6 @@ module Language.Nabla.TypeChecker where
 import Language.Nabla.AST
 import Data.SBV
 import Control.Concurrent.Async
-import Text.Megaparsec.Error
 
 class TypeInference a where
   infer :: a -> [Type p]
@@ -15,19 +14,13 @@ class TypeInference a where
 class TypeCheck a where
   valid :: a p -> [NamedFnType p] -> Either (TypeValidationError p) ()
 
-data TypeValidationError p = NameNotFound (Identifier p) deriving (Eq)
+data TypeValidationError p = NameNotFound (Identifier p)
 
 getPos :: TypeValidationError p -> p
 getPos (NameNotFound (Identifier p _)) = p
 
 instance Show (TypeValidationError p) where
   show (NameNotFound name) = "name '" <> show name <> "' is not defined"
-
-instance Ord (TypeValidationError p) where
-  compare _ _ = EQ
-
-instance ShowErrorComponent (TypeValidationError p) where
-  showErrorComponent = show
 
 instance TypeCheck Prog where
   valid (Prog (u:us)) ts = valid u ts *> valid (Prog us) ts

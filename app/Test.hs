@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Test where
 
 import System.Environment (getArgs)
@@ -24,5 +26,8 @@ main = do
   return ()
 
 
-customError :: TypeValidationError (PosState s) -> ParseErrorBundle s (TypeValidationError (PosState s))
+customError :: TypeValidationError (PosState s) -> ParseErrorBundle s String
 customError e = ParseErrorBundle ((FancyError 0 (singleton $ ErrorFail (show e))) :| []) (getPos e)
+
+instance ShowErrorComponent String where
+  showErrorComponent = show
