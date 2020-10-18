@@ -1,7 +1,6 @@
 import System.Exit
 import Test.HUnit
 import System.IO
-import ParserTest
 
 main = do
   counts <- runTestTT tests
@@ -10,8 +9,5 @@ main = do
     else exitSuccess
 
 tests = TestList $ concat
-  [ simpleValueTest
-  , complexValueTest
-  , variableExprTest
-  , assignExprTest
+  [
   ]
