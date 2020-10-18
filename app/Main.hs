@@ -1,37 +1,33 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Main where
 
-import Lib
-import Control.Monad.State
-import Control.Monad.Except
-import Control.Monad.Identity
+import System.Environment (getArgs)
+import qualified Data.Text.IO as DTI
+import Data.List.NonEmpty ( NonEmpty((:|)) )
+import Data.Set (singleton)
+import Text.Megaparsec (parse, PosState)
+import Text.Megaparsec.Error
+import Text.Megaparsec.Pos ( sourcePosPretty )
+import Language.Nabla.AST ( Identifier(Identifier) )
+import Language.Nabla.Parser (pProg)
+import Language.Nabla.TypeChecker
+    ( TypeCheck(valid), TypeValidationError(NameNotFound), getPos )
 
 main :: IO ()
 main = do
-  result <- (`evalStateT` 0) $ runExceptT $ do
-    i <- lift $ get
-    return ()
-  case result of
-    Right _ -> return ()
+  [fileName] <- getArgs
+  src <- DTI.readFile fileName
+  case parse pProg fileName src of
+    Right prog -> case (valid prog []) of
+      Right () -> print prog
+      Left e -> putStrLn $ errorBundlePretty $ customError e
+    Left e -> putStrLn $ errorBundlePretty e
+  return ()
 
-func :: StateT String Identity String
-func = return ""
 
-func' :: StateT String IO String
-func' = return ""
+customError :: TypeValidationError (PosState s) -> ParseErrorBundle s String
+customError e = ParseErrorBundle ((FancyError 0 (singleton $ ErrorFail (show e))) :| []) (getPos e)
 
-func'' :: StateT String Maybe String
-func'' = return ""
-
-func3 :: String
-func3 = evalState func ""
-
-func'3 :: IO String
-func'3 = evalStateT func' ""
-
-func''3 :: Maybe String
-func''3 = (`evalStateT` "") func''
-
-func2 :: String
-func2 = runIdentity $ do
-  return ""
-
+instance ShowErrorComponent String where
+  showErrorComponent = show
