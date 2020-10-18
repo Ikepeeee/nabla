@@ -12,15 +12,16 @@ import qualified Nabla.IST as IST
 data ValueState = ValueState {
   vars :: [IST.Var],
   types :: [IST.Type],
-  signatures :: [IST.Signature]
+  signatures :: [IST.Signature],
+  funcs :: [(String, IST.Function)]
 }
 
 addVars :: IST.Var -> ValueState -> ValueState
-addVars v vs = ValueState (v:(vars vs)) (types vs) (signatures vs)
+addVars v vs = ValueState (v:(vars vs)) (types vs) (signatures vs) (funcs vs)
 addTypes :: IST.Type -> ValueState -> ValueState
-addTypes tv vs = ValueState (vars vs) (tv:(types vs)) (signatures vs)
+addTypes tv vs = ValueState (vars vs) (tv:(types vs)) (signatures vs) (funcs vs)
 addTypedVars :: IST.Signature -> ValueState -> ValueState
-addTypedVars tv vs = ValueState (vars vs) (types vs) (tv:(signatures vs))
+addTypedVars tv vs = ValueState (vars vs) (types vs) (tv:(signatures vs)) (funcs vs)
 
 newtype Executor a = Executor (StateT ValueState (ExceptT String Identity) a)
   deriving (Functor, Applicative, Monad, MonadState ValueState, MonadError String)
@@ -57,6 +58,17 @@ eval (AST.Assign name v) = do
   modify $ addVars (name, v')
   modify $ addTypedVars (name, IST.infer v' (types vs))
   return v'
+eval (AST.Function f) = do
+  vs <- get
+  case lookup f (funcs vs) of
+    Just func -> return (IST.FunctionV func)
+    Nothing -> throwError $ unwords ["Error: function", f, "is not found"]
+eval (AST.Apply (AST.Function f) v) = undefined
+eval (AST.Apply expr v) = do
+  f <- eval expr
+  v' <- eval (AST.ValueExpr v)
+  case f of
+    (IST.FunctionV f) -> return (f v')
 
 stat :: AST.Stat -> Executor ()
 stat (AST.TypeAssign name (AST.TypeName t)) = do

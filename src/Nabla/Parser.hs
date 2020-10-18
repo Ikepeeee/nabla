@@ -22,8 +22,10 @@ stat = TypeAssign <$> identifierT <*> (typeAssignT *> typeExpr)
 expr :: Parser Expr
 expr
   = try (Assign <$> identifierT <*> (assignT *> expr))
-  <|> VariableExpr <$> identifierT
-  <|> ValueExpr <$> value
+  <|> try (VariableExpr <$> identifierT)
+  <|> try (ValueExpr <$> value)
+  <|> try (Function <$> identifierT)
+  <|> Apply <$> expr <*> value
 
 typeExpr :: Parser TypeExpr
 typeExpr = TypeName <$> identifierT

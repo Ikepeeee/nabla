@@ -27,6 +27,8 @@ data Expr
   = ValueExpr Value
   | VariableExpr Identifier
   | Assign Identifier Expr
+  | Apply Expr Value
+  | Function Identifier
   deriving (Eq)
 
 type Identifier = String

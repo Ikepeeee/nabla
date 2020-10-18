@@ -12,3 +12,10 @@ string' _ = False
 
 number' (NumberV _) = True
 number' _ = False
+
+functionVars =
+  [ ("add", add)
+  ]
+
+add :: Function
+add (NumberV x) = FunctionV (\(NumberV y) -> NumberV $ show ((read x :: Float) + (read y :: Float)))

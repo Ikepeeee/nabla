@@ -15,10 +15,10 @@ import Nabla.Parser (ast)
 import Nabla.Executor (exec, runExecutor, ValueState(ValueState))
 import System.Console.Haskeline
 import Nabla.IST (Value)
-import Nabla.Fixture (typeVars)
+import Nabla.Fixture (typeVars, functionVars)
 
 main :: IO ()
-main = repl $ ValueState [] typeVars []
+main = repl $ ValueState [] typeVars [] functionVars
 
 newtype REPL a = REPL (StateT ValueState (ExceptT String IO) a)
   deriving (Functor, Applicative, Monad, MonadState ValueState, MonadError String)

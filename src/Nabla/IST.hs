@@ -10,11 +10,14 @@ data Type = Type
 
 type TypedValue = (Value, [Type])
 
+type Function = Value -> Value
+
 data Value
   = NumberV String
   | StringV String
   | SymbolV String
   | ComplexV Context [Value]
+  | FunctionV Function
 
 instance Show Value where
   show (NumberV v) = v
