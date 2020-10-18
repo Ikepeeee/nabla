@@ -44,7 +44,9 @@ packages:
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
-
+extra-deps:
+  - sbv-8.7
+  - text-1.2.4.0
 # Control whether we use the GHC we find on the path
 # system-ghc: true
 #

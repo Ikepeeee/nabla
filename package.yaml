@@ -23,8 +23,13 @@ dependencies:
 - base >= 4.7 && < 5
 - mtl == 2.2.2
 - megaparsec == 7.0.5
+- parser-combinators == 1.1.0
 - haskeline == 0.7.5.0
 - HUnit == 1.6.0.0
+- sbv == 8.7
+- async == 2.2.2
+- containers == 0.6.0.1
+- text == 1.2.4.0
 
 library:
   source-dirs: src
