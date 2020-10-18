@@ -12,23 +12,26 @@ import Data.Text (Text)
 
 type Parser = Parsec Void Text
 
-pProg :: Parser (Prog SourcePos)
+getPosState :: Parser (PosState Text)
+getPosState = statePosState <$> getParserState
+
+pProg :: Parser (Prog (PosState Text))
 pProg = Prog <$> (scn *> many (pUnit <* scn)) <* eof
 
-pUnit :: Parser (Unit SourcePos)
+pUnit :: Parser (Unit (PosState Text))
 pUnit
   = try (UnitFnType <$> pNamedFnType)
   <|> try (UnitFnDef <$> pNamedFnDef)
   <|> UnitTypeDef <$> pNamedTypeDef
 
-pNamedTypeDef :: Parser (NamedTypeDef SourcePos)
+pNamedTypeDef :: Parser (NamedTypeDef (PosState Text))
 pNamedTypeDef = do
   name <- tIdentifier
   tDef
   td <- encloseRound' pTypeDef
   return $ NamedTypeDef name td
 
-pTypeDef :: Parser (TypeDef SourcePos)
+pTypeDef :: Parser (TypeDef (PosState Text))
 pTypeDef = do
   name <- tIdentifier
   tTypeDef
@@ -37,10 +40,10 @@ pTypeDef = do
   s <- pExpr
   return $ TypeDef name t s
 
-pType :: Parser (Type SourcePos)
+pType :: Parser (Type (PosState Text))
 pType = Type <$> tIdentifier
 
-pNamedFnDef :: Parser (NamedFnDef SourcePos)
+pNamedFnDef :: Parser (NamedFnDef (PosState Text))
 pNamedFnDef = do
   name <- tIdentifier
   args <- many tIdentifier
@@ -48,20 +51,20 @@ pNamedFnDef = do
   body <- pExpr
   return $ NamedFnDef name (Fn args body)
 
-pNamedFnType :: Parser (NamedFnType SourcePos)
+pNamedFnType :: Parser (NamedFnType (PosState Text))
 pNamedFnType = do
   name <- tIdentifier
   tTypeDef
   fnType <- pFnType
   return $ NamedFnType name fnType
 
-pFnType :: Parser (FnType SourcePos)
+pFnType :: Parser (FnType (PosState Text))
 pFnType = do
   t <- pType
   ts <- many $ tArrow *> pType
   return $ FnType (init (t:ts)) (last (t:ts))
 
-pFn :: Parser (Fn SourcePos)
+pFn :: Parser (Fn (PosState Text))
 pFn = do
   fnSt
   args <- many tIdentifier
@@ -71,13 +74,13 @@ pFn = do
     where
       fnSt = L.lexeme sc $ char '\\'
 
-pExpr :: Parser (Expr SourcePos)
-pExpr = Expr <$> getSourcePos <*> pValue <*> many pValue
+pExpr :: Parser (Expr (PosState Text))
+pExpr = Expr <$> getPosState <*> pValue <*> many pValue
 
-pValue :: Parser (Value SourcePos)
+pValue :: Parser (Value (PosState Text))
 pValue
   = Alias <$> tIdentifier
-  <|> Const <$> getSourcePos <*> pConst
+  <|> Const <$> getPosState <*> pConst
   <|> FnValue <$> pFn
   <|> ExprValue <$> encloseRound pExpr
 
@@ -113,8 +116,8 @@ encloseRound' p = between st ed p
     st = L.lexeme sc $ string "{" *> pure ()
     ed = L.lexeme sc $ string "}" *> pure ()
 
-tIdentifier :: Parser (Identifier SourcePos)
-tIdentifier = L.lexeme sc $ Identifier <$> getSourcePos <*> ((:) <$> lowerChar <*> many alphaNumChar)
+tIdentifier :: Parser (Identifier (PosState Text))
+tIdentifier = L.lexeme sc $ Identifier <$> getPosState <*> ((:) <$> lowerChar <*> many alphaNumChar)
 
 tDirect :: Parser String
 tDirect = try (show <$> floatT) <|> (show <$> intT) <|> dataT
@@ -131,7 +134,6 @@ intDirect = L.lexeme sc $ (str '\'') <|> (str '"') <|> (str '`')
   where
     str :: Char -> Parser String
     str c = char c *> manyTill L.charLiteral (char c)
-
 
 scn :: Parser ()
 scn = L.space
