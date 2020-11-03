@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Language.Nabla.Parser where
 
@@ -10,26 +11,30 @@ import Control.Monad.Combinators.Expr ()
 import Language.Nabla.AST
 import Data.Text (Text)
 
+import Debug.Trace
+
 type Parser = Parsec Void Text
 
 getPosState :: Parser (PosState Text)
 getPosState = statePosState <$> getParserState
 
+parseNabla = parse pProg
+
 pProg :: Parser (Prog (PosState Text))
 pProg = Prog <$> (scn *> many (pUnit <* scn)) <* eof
 
-pUnit :: Parser (Unit (PosState Text))
+pUnit :: Parser (NamedUnit (PosState Text))
 pUnit
-  = try (UnitFnType <$> pNamedFnType)
-  <|> try (UnitFnDef <$> pNamedFnDef)
-  <|> UnitTypeDef <$> pNamedTypeDef
+  = try pNamedFnType
+  <|> try pNamedFnDef
+  <|> pNamedTypeDef
 
-pNamedTypeDef :: Parser (NamedTypeDef (PosState Text))
+pNamedTypeDef :: Parser (NamedUnit (PosState Text))
 pNamedTypeDef = do
   name <- tIdentifier
   tDef
   td <- encloseRound' pTypeDef
-  return $ NamedTypeDef name td
+  return $ NamedUnit (name, UnitTypeDef td)
 
 pTypeDef :: Parser (TypeDef (PosState Text))
 pTypeDef = do
@@ -43,20 +48,20 @@ pTypeDef = do
 pType :: Parser (Type (PosState Text))
 pType = Type <$> tIdentifier
 
-pNamedFnDef :: Parser (NamedFnDef (PosState Text))
+pNamedFnDef :: Parser (NamedUnit (PosState Text))
 pNamedFnDef = do
   name <- tIdentifier
   args <- many tIdentifier
   tDef
   body <- pExpr
-  return $ NamedFnDef name (Fn args body)
+  return $ NamedUnit (name, UnitFn (Fn args body))
 
-pNamedFnType :: Parser (NamedFnType (PosState Text))
+pNamedFnType :: Parser (NamedUnit (PosState Text))
 pNamedFnType = do
   name <- tIdentifier
   tTypeDef
   fnType <- pFnType
-  return $ NamedFnType name fnType
+  return $ NamedUnit (name, UnitFnType fnType)
 
 pFnType :: Parser (FnType (PosState Text))
 pFnType = do

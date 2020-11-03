@@ -9,11 +9,6 @@ type AliasName = String
 
 data Type p = Type (Identifier p)
 
-data NamedTypeDef p = NamedTypeDef (Identifier p) (TypeDef p)
-
-instance Show (NamedTypeDef p) where
-  show (NamedTypeDef name typedef) = show name <> " = " <> "{ " <> show typedef <>  " }"
-
 data TypeDef p = TypeDef
   { element :: Identifier p
   , elementType :: Type p
@@ -26,29 +21,25 @@ instance Show (TypeDef p) where
 instance Show (Type p) where
   show (Type name) = show name
 
-data Prog p = Prog [Unit p]
+data Prog p = Prog [NamedUnit p]
 
 instance Show (Prog p) where
   show (Prog ps) = intercalate "\n" $ map show ps
 
+newtype NamedUnit p = NamedUnit (Identifier p, Unit　p)
 data Unit　p
-  = UnitFnDef (NamedFnDef p)
-  | UnitFnType (NamedFnType p)
-  | UnitTypeDef (NamedTypeDef p)
+  = UnitFn (Fn p)
+  | UnitFnType (FnType p)
+  | UnitTypeDef (TypeDef p)
 
-instance Show (Unit p) where
-  show (UnitFnDef u) = show u
-  show (UnitFnType u) = show u
-  show (UnitTypeDef u) = show u
-
-data NamedFnDef p = NamedFnDef (Identifier p) (Fn p)
-
-instance Show (NamedFnDef p) where
-  show (NamedFnDef n f) = show n <> " = " <> show f
+instance Show (NamedUnit p) where
+  show (NamedUnit (name, UnitFn u)) = show name <> " = " <> show u
+  show (NamedUnit (name, UnitFnType u)) = show name <> " :: " <> show u
+  show (NamedUnit (name, UnitTypeDef u)) = show name <> " = " <> show u
 
 data Fn p
   = Fn
-    { args :: [(Identifier p)]
+    { fnArgs :: [(Identifier p)]
     , fnBody :: (Expr p)
     }
 
@@ -58,11 +49,6 @@ instance Show (Fn p) where
     <> (intercalate " " $ map show args)
     <> " -> "
     <> (show fnBody)
-
-data NamedFnType p = NamedFnType (Identifier p) (FnType p)
-
-instance Show (NamedFnType p) where
-  show (NamedFnType name fnType) = show name <> " :: " <> show fnType
 
 data FnType p
   = FnType
