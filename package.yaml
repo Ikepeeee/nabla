@@ -23,10 +23,8 @@ dependencies:
 - base >= 4.7 && < 5
 - mtl == 2.2.2
 - megaparsec == 9.0.1
-- hspec-megaparsec == 2.2.0
 - parser-combinators == 1.1.0
 - haskeline == 0.7.5.0
-- HUnit == 1.6.0.0
 - sbv == 8.7
 - async == 2.2.2
 - containers == 0.6.0.1
@@ -56,3 +54,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - nabla
+    - hspec-megaparsec == 2.2.0
+    - hspec == 2.7.4

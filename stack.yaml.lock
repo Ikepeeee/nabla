@@ -32,6 +32,27 @@ packages:
       sha256: 55cfefc7cab71d84528ddc846040c60a27e827e806d39aeba8ca5a2bf0a5e96c
   original:
     hackage: hspec-megaparsec-2.2.0
+- completed:
+    hackage: hspec-2.7.4@sha256:8d0430e4a7ba8fa1482a1766fd4973f0c5e7c5adf512bded7358269bb9486c9e,1692
+    pantry-tree:
+      size: 532
+      sha256: 6a6ba1798090ee6245f5995303b6ccf1afea26c73d4e69b95330c8914056d420
+  original:
+    hackage: hspec-2.7.4
+- completed:
+    hackage: hspec-core-2.7.4@sha256:d37eab1d356deef00063575796bcf6029207bfaa27ec984f13222ef0862d8f5b,4537
+    pantry-tree:
+      size: 3748
+      sha256: 4a8904e018794b1ff735ed54d413402225f0794f746b1b3aef368c63890feecc
+  original:
+    hackage: hspec-core-2.7.4
+- completed:
+    hackage: hspec-discover-2.7.4@sha256:b6c6f50d313d7d3ed3929f6dd35e0f4c726d6fc76915c6b5e48374e895628866,2166
+    pantry-tree:
+      size: 1080
+      sha256: 68dcd6bab85df3c84a0f088624241be2867c94b0cdd76acd6e85c318e37be606
+  original:
+    hackage: hspec-discover-2.7.4
 snapshots:
 - completed:
     size: 523878
