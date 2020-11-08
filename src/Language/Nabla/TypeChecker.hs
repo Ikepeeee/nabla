@@ -12,7 +12,7 @@ class TypeInference a where
   infer :: a -> [Type p]
 
 class TypeCheck a where
-  valid :: a p -> [NamedFnType p] -> Either (TypeValidationError p) ()
+  valid :: a p -> [NamedUnit p] -> Either (TypeValidationError p) ()
 
 data TypeValidationError p = NameNotFound (Identifier p)
 
@@ -26,24 +26,30 @@ instance TypeCheck Prog where
   valid (Prog (u:us)) ts = valid u ts *> valid (Prog us) ts
   valid (Prog []) _ = Right ()
 
-instance TypeCheck Unit where
-  valid (UnitFnDef e) = valid e
-  valid (UnitFnType e) = valid e
-  valid (UnitTypeDef e) = valid e
+instance TypeCheck NamedUnit where
+  valid (NamedUnit (name, UnitFn e)) us = valid e us
+  valid (NamedUnit (name, UnitFnType e)) us = pure ()
+  valid (NamedUnit (name, UnitTypeDef e)) us = pure ()
 
-instance TypeCheck NamedFnDef where
-  valid (NamedFnDef name _) _ = Left $ NameNotFound name
+instance TypeCheck Fn where
+  valid (Fn _ body) us = valid body us
 
-instance TypeCheck NamedFnType where
-  valid (NamedFnType name _) _ = Left $ NameNotFound name
+instance TypeCheck Expr where
+  valid (Expr _ v []) us = valid v us
+  valid (Expr p v vs) us = valid v us *> valid (Expr p (head vs) (tail vs)) us
 
-instance TypeCheck NamedTypeDef where
-  valid (NamedTypeDef name _) _ = Left $ NameNotFound name
+instance TypeCheck Value where
+  valid (Alias name) us = findByName name us *> pure ()
+  valid (FnValue fn) us = valid fn us
+  valid (Const _ _ ) _ = pure ()
+  valid (ExprValue expr) us = valid expr us
 
-findByName :: Identifier p -> [(Identifier p, a)] -> Either (TypeValidationError p) a
-findByName name types = case lookup name types of
+findByName :: Identifier p -> [NamedUnit p] -> Either (TypeValidationError p) (Unit p)
+findByName name nus = case lookup name us of
   Just a -> Right a
   Nothing -> Left $ NameNotFound name
+  where
+    us = map (\(NamedUnit u) -> u) nus
 
 -- instance TypeCheck (Expr p) where
 --   valid (Expr p v vs) types =

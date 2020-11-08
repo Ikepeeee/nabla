@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Language.Nabla.Parser where
 
@@ -8,30 +9,48 @@ import Data.Void
 import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Monad.Combinators.Expr ()
 import Language.Nabla.AST
+import Language.Nabla.SourceSpan
 import Data.Text (Text)
+
+import Debug.Trace
 
 type Parser = Parsec Void Text
 
-getPosState :: Parser (PosState Text)
-getPosState = statePosState <$> getParserState
+withSourceSpan :: (SourceSpan -> a -> b) -> Parser a -> Parser b
+withSourceSpan f parser = do
+  stPos <- getSourcePos
+  body <- parser
+  edPos <- getSourcePos
+  return $ f (toSourceSpan stPos edPos) body
 
-pProg :: Parser (Prog (PosState Text))
+toSourceSpan :: SourcePos -> SourcePos -> SourceSpan
+toSourceSpan
+  (SourcePos name stLine stCol)
+  (SourcePos _ edLine edCol)
+  = SourceSpan name $ TextSpan
+    (TextPos (unPos stLine) (unPos stCol))
+    (TextPos (unPos edLine) (unPos edCol))
+
+parseNabla :: String -> Text -> Either (ParseErrorBundle Text Void) (Prog SourceSpan)
+parseNabla = parse pProg
+
+pProg :: Parser (Prog SourceSpan)
 pProg = Prog <$> (scn *> many (pUnit <* scn)) <* eof
 
-pUnit :: Parser (Unit (PosState Text))
+pUnit :: Parser (NamedUnit SourceSpan)
 pUnit
-  = try (UnitFnType <$> pNamedFnType)
-  <|> try (UnitFnDef <$> pNamedFnDef)
-  <|> UnitTypeDef <$> pNamedTypeDef
+  = try pNamedFnType
+  <|> try pNamedFnDef
+  <|> pNamedTypeDef
 
-pNamedTypeDef :: Parser (NamedTypeDef (PosState Text))
+pNamedTypeDef :: Parser (NamedUnit SourceSpan)
 pNamedTypeDef = do
   name <- tIdentifier
   tDef
   td <- encloseRound' pTypeDef
-  return $ NamedTypeDef name td
+  return $ NamedUnit (name, UnitTypeDef td)
 
-pTypeDef :: Parser (TypeDef (PosState Text))
+pTypeDef :: Parser (TypeDef SourceSpan)
 pTypeDef = do
   name <- tIdentifier
   tTypeDef
@@ -40,31 +59,31 @@ pTypeDef = do
   s <- pExpr
   return $ TypeDef name t s
 
-pType :: Parser (Type (PosState Text))
+pType :: Parser (Type SourceSpan)
 pType = Type <$> tIdentifier
 
-pNamedFnDef :: Parser (NamedFnDef (PosState Text))
+pNamedFnDef :: Parser (NamedUnit SourceSpan)
 pNamedFnDef = do
   name <- tIdentifier
   args <- many tIdentifier
   tDef
   body <- pExpr
-  return $ NamedFnDef name (Fn args body)
+  return $ NamedUnit (name, UnitFn (Fn args body))
 
-pNamedFnType :: Parser (NamedFnType (PosState Text))
+pNamedFnType :: Parser (NamedUnit SourceSpan)
 pNamedFnType = do
   name <- tIdentifier
   tTypeDef
   fnType <- pFnType
-  return $ NamedFnType name fnType
+  return $ NamedUnit (name, UnitFnType fnType)
 
-pFnType :: Parser (FnType (PosState Text))
+pFnType :: Parser (FnType SourceSpan)
 pFnType = do
   t <- pType
   ts <- many $ tArrow *> pType
   return $ FnType (init (t:ts)) (last (t:ts))
 
-pFn :: Parser (Fn (PosState Text))
+pFn :: Parser (Fn SourceSpan)
 pFn = do
   fnSt
   args <- many tIdentifier
@@ -74,13 +93,13 @@ pFn = do
     where
       fnSt = L.lexeme sc $ char '\\'
 
-pExpr :: Parser (Expr (PosState Text))
-pExpr = Expr <$> getPosState <*> pValue <*> many pValue
+pExpr :: Parser (Expr SourceSpan)
+pExpr = withSourceSpan Expr pValue <*> many pValue
 
-pValue :: Parser (Value (PosState Text))
+pValue :: Parser (Value SourceSpan)
 pValue
   = Alias <$> tIdentifier
-  <|> Const <$> getPosState <*> pConst
+  <|> withSourceSpan Const pConst
   <|> FnValue <$> pFn
   <|> ExprValue <$> encloseRound pExpr
 
@@ -116,8 +135,8 @@ encloseRound' p = between st ed p
     st = L.lexeme sc $ string "{" *> pure ()
     ed = L.lexeme sc $ string "}" *> pure ()
 
-tIdentifier :: Parser (Identifier (PosState Text))
-tIdentifier = L.lexeme sc $ Identifier <$> getPosState <*> ((:) <$> lowerChar <*> many alphaNumChar)
+tIdentifier :: Parser (Identifier SourceSpan)
+tIdentifier = L.lexeme sc $ withSourceSpan Identifier ((:) <$> lowerChar <*> many alphaNumChar)
 
 tDirect :: Parser String
 tDirect = try (show <$> floatT) <|> (show <$> intT) <|> dataT
