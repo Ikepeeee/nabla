@@ -12,7 +12,7 @@ class TypeInference a where
   infer :: a -> [Type p]
 
 class TypeCheck a where
-  valid :: a p -> [NamedUnit p] -> Either (TypeValidationError p) ()
+  valid :: a p -> [NamedUnit p] -> [TypeValidationError p]
 
 data TypeValidationError p = NameNotFound (Identifier p)
 
@@ -23,25 +23,27 @@ instance Show (TypeValidationError p) where
   show (NameNotFound name) = "name '" <> show name <> "' is not defined"
 
 instance TypeCheck Prog where
-  valid (Prog (u:us)) ts = valid u ts *> valid (Prog us) ts
-  valid (Prog []) _ = Right ()
+  valid (Prog (u:us)) ts = valid u ts <> valid (Prog us) ts
+  valid (Prog []) _ = []
 
 instance TypeCheck NamedUnit where
   valid (NamedUnit (name, UnitFn e)) us = valid e us
-  valid (NamedUnit (name, UnitFnType e)) us = pure ()
-  valid (NamedUnit (name, UnitTypeDef e)) us = pure ()
+  valid (NamedUnit (name, UnitFnType e)) us = []
+  valid (NamedUnit (name, UnitTypeDef e)) us = []
 
 instance TypeCheck Fn where
   valid (Fn _ body) us = valid body us
 
 instance TypeCheck Expr where
   valid (Expr _ v []) us = valid v us
-  valid (Expr p v vs) us = valid v us *> valid (Expr p (head vs) (tail vs)) us
+  valid (Expr p v vs) us = valid v us <> valid (Expr p (head vs) (tail vs)) us
 
 instance TypeCheck Value where
-  valid (Alias name) us = findByName name us *> pure ()
+  valid (Alias name) us = case findByName name us of
+    Right _ -> []
+    Left e -> [e]
   valid (FnValue fn) us = valid fn us
-  valid (Const _ _ ) _ = pure ()
+  valid (Const _ _ ) _ = []
   valid (ExprValue expr) us = valid expr us
 
 findByName :: Identifier p -> [NamedUnit p] -> Either (TypeValidationError p) (Unit p)

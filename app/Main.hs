@@ -4,6 +4,7 @@ module Main where
 
 import System.Environment (getArgs)
 import qualified Data.Text.IO as DTI
+import Data.List (intercalate)
 import Data.List.NonEmpty ( NonEmpty((:|)) )
 import Data.Set (singleton)
 import Text.Megaparsec (parse, PosState)
@@ -21,8 +22,10 @@ main = do
   src <- DTI.readFile fileName
   case parse pProg fileName src of
     Right prog -> case (valid prog []) of
-      Right () -> print prog
-      Left e -> putStrLn $ show (getPos e) <> "\n" <> textSpanPretty (textSpan $ getPos e) src <> show e
+      [] -> print prog
+      es -> putStrLn $ intercalate "\n\n" $ map
+        (\e -> show (getPos e) <> "\n" <> textSpanPretty (textSpan $ getPos e) src <> show e)
+        es
     Left e -> putStrLn $ errorBundlePretty e
   return ()
 
