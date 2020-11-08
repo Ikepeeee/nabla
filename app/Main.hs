@@ -13,6 +13,7 @@ import Language.Nabla.AST ( Identifier(Identifier) )
 import Language.Nabla.Parser (pProg)
 import Language.Nabla.TypeChecker
     ( TypeCheck(valid), TypeValidationError(NameNotFound), getPos )
+import Language.Nabla.SourceSpan
 
 main :: IO ()
 main = do
@@ -21,7 +22,7 @@ main = do
   case parse pProg fileName src of
     Right prog -> case (valid prog []) of
       Right () -> print prog
-      Left e -> putStrLn $ errorBundlePretty $ customError e
+      Left e -> putStrLn $ show (getPos e) <> "\n" <> textSpanPretty (textSpan $ getPos e) src <> show e
     Left e -> putStrLn $ errorBundlePretty e
   return ()
 
