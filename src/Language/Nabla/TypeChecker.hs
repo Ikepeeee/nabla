@@ -8,6 +8,9 @@ import Language.Nabla.AST
 import Data.SBV
 import Control.Concurrent.Async
 
+check :: Prog p -> [TypeValidationError p]
+check (Prog us) = valid (Prog us) us
+
 class TypeInference a where
   infer :: a -> [Type p]
 
