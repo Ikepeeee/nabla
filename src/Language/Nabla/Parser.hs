@@ -94,7 +94,17 @@ pFn = do
       fnSt = L.lexeme sc $ char '\\'
 
 pExpr :: Parser (Expr SourceSpan)
-pExpr = withSourceSpan Expr pValue <*> many pValue
+pExpr = withSourceSpan makeExpr
+  ((try $ (,) <$> pValue <*> many pValue)
+  <|> do
+    lOp <- pValue
+    b <- tBinary
+    rOp <- pValue
+    return (Alias b, [lOp, rOp])
+  )
+  where
+    makeExpr :: SourceSpan -> (Value SourceSpan, [Value SourceSpan]) -> Expr SourceSpan
+    makeExpr span (f, us) = Expr span f us
 
 pValue :: Parser (Value SourceSpan)
 pValue
@@ -105,6 +115,14 @@ pValue
 
 pConst :: Parser Const
 pConst = Direct <$> tDirect <|> Indirect <$> intDirect
+
+tBinary :: Parser (Identifier SourceSpan)
+tBinary = L.lexeme sc $ withSourceSpan Identifier $ choice
+  [ "+" <$ string "+"
+  , "-" <$ string "-"
+  , "*" <$ string "*"
+  , "/" <$ string "/"
+  ]
 
 tDef :: Parser ()
 tDef = L.lexeme sc $ char '=' *> pure ()
