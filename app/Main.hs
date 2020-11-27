@@ -2,6 +2,7 @@
 
 module Main where
 
+import System.IO
 import System.Environment (getArgs)
 import qualified Data.Text.IO as DTI
 import Language.Nabla.Compiler (compile)
@@ -11,6 +12,6 @@ main = do
   [fileName] <- getArgs
   src <- DTI.readFile fileName
   case compile [(fileName, src)] of
-    Right [(_, dist)] -> print dist
-    Left e -> putStrLn e
+    Right [(distFile, dist)] -> DTI.writeFile distFile dist
+    Left e -> hPutStrLn stderr e
   return ()
