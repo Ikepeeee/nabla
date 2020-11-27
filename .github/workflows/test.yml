@@ -12,7 +12,6 @@ jobs:
     - uses: actions/setup-haskell@v1.1
       with:
         ghc-version: '8.6.5'
-        cabal-version: '3.0'
         enable-stack: true
         stack-version: 'latest'
     - name: Build
