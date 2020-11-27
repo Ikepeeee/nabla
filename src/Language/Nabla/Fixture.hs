@@ -45,6 +45,7 @@ fixtureFnTypes =
   , (Fixture "and", FnType [Type $ Fixture "Bool", Type $ Fixture "Bool"] (Type $ Fixture "Bool"))
   , (Fixture "or", FnType [Type $ Fixture "Bool", Type $ Fixture "Bool"] (Type $ Fixture "Bool"))
   , (Fixture "not", FnType [Type $ Fixture "Bool", Type $ Fixture "Bool"] (Type $ Fixture "Bool"))
+  , (Fixture "p", FnType [Type $ Fixture "Any"] (Type $ Fixture "Void"))
   ]
 
 tInteger :: EvaluatableType
