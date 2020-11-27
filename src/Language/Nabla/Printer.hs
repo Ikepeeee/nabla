@@ -3,6 +3,7 @@ module Language.Nabla.Printer (printJS) where
 import Data.Text (Text, pack)
 import Data.List (intercalate)
 import Language.Nabla.AST
+import Language.Nabla.Fixture
 
 printJS :: Prog p -> Text
 printJS (Prog us) = pack $ join "\n" printJSNamedUnit us
@@ -13,11 +14,15 @@ printJsNamedUnit _ = ""
 
 printJSFn :: Fn p -> String
 printJSFn (Fn args body)
-  = "(" <> join ", " show args <> ")" <> " => " <> printJSExpr body
+  = concatMap (\arg -> "(" <> show arg <> ")" <> " => ") args <> printJSExpr body
 
 printJSExpr :: Expr p -> String
 printJSExpr (Expr _ v []) = printJSValue v
-printJSExpr (Expr _ v vs) = printJSValue v <> "(" <> join ", " printJSValue vs <> ")"
+printJSExpr (Expr _ v vs) = case v of
+  (Alias name) -> case lookup name fixtureFns of
+    Just printJSFixture -> printJSFixture (map printJSValue vs)
+    Nothing -> printJSValue v <> concatMap (\arg -> "(" <> show arg <> ")") vs
+  _ -> printJSValue v <> concatMap (\arg -> "(" <> show arg <> ")") vs
 
 printJSValue :: Value p -> String
 printJSValue (Alias name) = show name

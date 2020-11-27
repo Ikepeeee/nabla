@@ -5,11 +5,12 @@
 module Language.Nabla.TypeChecker where
 
 import Language.Nabla.AST
+import Language.Nabla.Fixture
 import Data.SBV
 import Control.Concurrent.Async
 
 check :: Prog p -> [TypeValidationError p]
-check (Prog us) = valid (Prog us) us
+check (Prog us) = valid (Prog us) (us <> map (\(name, t) -> NamedUnit (name, UnitFnType t)) fixtureFnTypes)
 
 class TypeInference a where
   infer :: a -> [Type p]
