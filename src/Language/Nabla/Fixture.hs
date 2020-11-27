@@ -8,23 +8,20 @@ import Data.Maybe (isJust)
 import Data.SBV
 import Language.Nabla.AST
 
-type EvaluatableFn = [Const] -> Const
+type EvaluatableFn = [String] -> String
 type EvaluatableType = Const -> Bool
 type EvaluatableFnType =　[AliasName]
 
 fixtureFns :: [((Identifier p), EvaluatableFn)]
 fixtureFns =
-  [ (Fixture "+", \[a, b] -> direct (read' a + read' b :: Integer))
-  , (Fixture "+", \[a, b] -> direct (read' a + read' b :: Double))
-  , (Fixture "-", \[a, b] -> direct (read' a - read' b :: Integer))
-  , (Fixture "-", \[a, b] -> direct (read' a - read' b :: Double))
-  , (Fixture "*", \[a, b] -> direct (read' a * read' b :: Integer))
-  , (Fixture "*", \[a, b] -> direct (read' a * read' b :: Double))
-  , (Fixture "/", \[a, b] -> direct (read' a `div` read' b :: Integer))
-  , (Fixture "/", \[a, b] -> direct (read' a / read' b :: Double))
-  , (Fixture "and", \[a, b] -> direct (read' a && read' b :: Bool))
-  , (Fixture "or", \[a, b] -> direct (read' a || read' b :: Bool))
-  , (Fixture "not", \[a] -> direct (not (read' a) :: Bool))
+  [ (Fixture "+", \[a, b] -> a <> " + " <> b)
+  , (Fixture "-", \[a, b] -> a <> " - " <> b)
+  , (Fixture "*", \[a, b] -> a <> " * " <> b)
+  , (Fixture "/", \[a, b] -> a <> " / " <> b)
+  , (Fixture "and", \[a, b] -> a <> " && " <> b)
+  , (Fixture "or", \[a, b] -> a <> " || " <> b)
+  , (Fixture "not", \[a] -> "!" <> a)
+  , (Fixture "p", \[a] -> "console.log(" <> a <> ")")
   ]
 
 fixtureTypes :: [((Identifier p), EvaluatableType)]
