@@ -43,6 +43,9 @@ data Fn p
     , fnBody :: (Expr p)
     }
 
+instance Eq (Fn p) where
+  (Fn args1 body1) == (Fn args2 body2) = args1 == args2 && body1 == body2
+
 instance Show (Fn p) where
   show (Fn args fnBody) =
     "\\"
@@ -61,6 +64,9 @@ instance Show (FnType p) where
 
 data Expr p = Expr p (Value p) [Value p]
 
+instance Eq (Expr p) where
+  (Expr _ f1 args1) == (Expr _ f2 args2) = f1 == f2 && args1 == args2
+
 instance Show (Expr p) where
   show (Expr _ v vs) = (intercalate " " $ map show (v:vs))
 
@@ -75,6 +81,12 @@ instance Show (Value p) where
   show (FnValue f) = "(" <> show f <> ")"
   show (Const _ c) = show c
   show (ExprValue e) = "(" <> show e <> ")"
+
+instance Eq (Value p) where
+  (Alias a) == (Alias b) = a == b
+  (FnValue a) == (FnValue b) = a == b
+  (Const _ a) == (Const _ b) = a == b
+  (ExprValue a) == (ExprValue b) = a == b
 
 data Const
   = Direct String

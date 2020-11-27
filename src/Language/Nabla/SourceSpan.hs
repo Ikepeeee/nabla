@@ -2,6 +2,9 @@ module Language.Nabla.SourceSpan  where
 
 import qualified Data.Text as DT
 
+sourceSpan :: FilePath -> Int -> Int -> Int -> Int -> SourceSpan
+sourceSpan n sl sc el ec = SourceSpan n (TextSpan (TextPos sl sc) (TextPos el ec))
+
 data SourceSpan = SourceSpan
   { sourceName :: FilePath
   , textSpan :: TextSpan
