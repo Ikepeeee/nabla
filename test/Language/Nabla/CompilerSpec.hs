@@ -8,10 +8,14 @@ import Language.Nabla.Compiler
 spec :: Spec
 spec = do
   describe "Compile" $ do
-    it "Simple Function" $
-      compile [("test.nb", simpleFunctionSrc)] `shouldBe` Right [("test.js", simpleFunctionDist)]
-    it "Simple 2 Functions" $
-      compile [("test.nb", simple2FunctionsSrc)] `shouldBe` Right [("test.js", simple2FunctionsDist)]
+    it "No Argument Function" $
+      compile [("test.nb", noArgumentFunctionSrc)] `shouldBe` Right [("test.js", noArgumentFunctionDist)]
+    it "Binary Operator Function" $
+      compile [("test.nb", binaryOperatorFunctionSrc)] `shouldBe` Right [("test.js", binaryOperatorFunctionDist)]
+    it "User-Defined Function" $
+      compile [("test.nb", userDefinedFunctionSrc)] `shouldBe` Right [("test.js", userDefinedFunctionDist)]
+    it "Higher Order Function" $
+      compile [("test.nb", higherOrderFunctionSrc)] `shouldBe` Right [("test.js", higherOrderFunctionDist)]
   describe "Error" $ do
     it "Not Defined Function" $
       compile [("test.nb", notDefinedFunctionSrc)] `shouldBe` Left notDefinedFunctionErrorMessage
@@ -24,18 +28,31 @@ spec = do
     it "Incorrect Function Type" $
       compile [("test.nb", incorrectFunctionTypeSrc)] `shouldBe` Left incorrectFunctionTypeErrorMessage
 
-simpleFunctionSrc = pack "f a b = a + b"
-simpleFunctionDist = pack "const f = (a, b) => a + b;"
+noArgumentFunctionSrc = pack "a = 1"
+noArgumentFunctionDist = pack "const a = () => 1;"
 
-simple2FunctionsSrc
+binaryOperatorFunctionSrc = pack "f a b = a + b"
+binaryOperatorFunctionDist = pack "const f = (a) => (b) => a + b;"
+
+userDefinedFunctionSrc
   = pack
   "id a = a\n\
   \g = id 2"
-simple2FunctionsDist
+userDefinedFunctionDist
   = pack
   "const id = (a) => a;\n\
   \const g = () => id(2);"
 
+higherOrderFunctionSrc
+  = pack
+  "apply f a = f a\n\
+  \incr n = n + 1\n\
+  \main = apply incr 2"
+higherOrderFunctionDist
+  = pack
+  "const apply = (f) => (a) => f(a);\n\
+  \const incr = (n) => n + 1;\n\
+  \const main = () => apply(incr)(2);"
 
 notDefinedFunctionSrc = pack "f a = foo a"
 notDefinedFunctionErrorMessage
