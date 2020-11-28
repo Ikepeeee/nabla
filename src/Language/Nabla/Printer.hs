@@ -10,9 +10,10 @@ printJS (Prog us) = pack $ join "\n" printJSNamedUnit us
 
 printJSNamedUnit :: NamedUnit p -> String
 printJSNamedUnit (NamedUnit (name, UnitFn fn)) = "const " <> show name <> " = " <> printJSFn fn <> ";"
-printJsNamedUnit _ = ""
+printJSNamedUnit _ = ""
 
 printJSFn :: Fn p -> String
+printJSFn (Fn [] body) = "() => " <> printJSExpr body
 printJSFn (Fn args body)
   = concatMap (\arg -> "(" <> show arg <> ")" <> " => ") args <> printJSExpr body
 
