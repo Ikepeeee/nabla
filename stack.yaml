@@ -45,6 +45,7 @@ packages:
 # Extra package databases containing global packages
 # extra-package-dbs: []
 extra-deps:
+  - lens-4.19.2
   - sbv-8.7
   - text-1.2.4.0
   - megaparsec-9.0.1

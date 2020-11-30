@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - filepath == 1.4.2.1
 - mtl == 2.2.2
+- lens == 4.19.2
 - megaparsec == 9.0.1
 - parser-combinators == 1.1.0
 - haskeline == 0.7.5.0
