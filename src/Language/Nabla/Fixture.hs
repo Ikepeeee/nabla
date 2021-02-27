@@ -12,6 +12,10 @@ type EvaluatableFn = [String] -> String
 type EvaluatableType = Const -> Bool
 type EvaluatableFnType =　[AliasName]
 
+-- fixtures :: [NamedUnit p]
+-- fixtures =
+--   concat [map Named fixtureFnTypes]
+
 fixtureFns :: [((Identifier p), EvaluatableFn)]
 fixtureFns =
   [ (Fixture "+", \[a, b] -> a <> " + " <> b)

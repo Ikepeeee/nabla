@@ -58,7 +58,7 @@ mkProgDict (Prog ((NamedUnit (name, UnitTypeDef tp)):us)) dict
   = mkProgDict (Prog us) $ addTypeDef name tp dict
 
 class TypeInference a where
-  infer :: a -> [Type p]
+  infer :: a p -> ProgDict p -> [Type p]
 
 class TypeCheck a where
   valid :: a p -> ProgDict p -> [TypeValidationError p]
@@ -105,6 +105,9 @@ instance TypeCheck Value where
   valid (FnValue fn) us = valid fn us
   valid (Const _ _ ) _ = []
   valid (ExprValue expr) us = valid expr us
+
+instance TypeInference Value where
+  infer (Alias name) dict = undefined
 
 findByName :: Identifier p -> [(Identifier p, a)] -> Either (TypeValidationError p) a
 findByName name us = case lookup name us of

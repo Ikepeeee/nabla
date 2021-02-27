@@ -10,6 +10,11 @@ import Language.Nabla.TypeChecker (check, getPos)
 import Language.Nabla.Printer (printJS)
 import Language.Nabla.SourceSpan
 
+import Debug.Trace (trace)
+
+trace' :: (Show a) => String -> a -> a
+trace' m a = trace (m <> show a) a
+
 -- TODO compile nabla source to JavaScript code
 
 compile :: [(FilePath, DT.Text)] -> Either String [(FilePath, DT.Text)]

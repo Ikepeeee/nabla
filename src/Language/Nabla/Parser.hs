@@ -7,10 +7,10 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Data.Void
 import qualified Text.Megaparsec.Char.Lexer as L
-import Control.Monad.Combinators.Expr ()
+import Control.Monad.Combinators.Expr
 import Language.Nabla.AST
 import Language.Nabla.SourceSpan
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 
 import Debug.Trace
 
@@ -94,14 +94,39 @@ pFn = do
       fnSt = L.lexeme sc $ char '\\'
 
 pExpr :: Parser (Expr SourceSpan)
-pExpr = withSourceSpan makeExpr
-  ((try $ (,) <$> pValue <*> many pValue)
-  <|> do
+pExpr = makeExprParser pTerm operatorTable
+
+operatorTable :: [[Operator Parser (Expr SourceSpan)]]
+operatorTable =
+  [ [ binary "*"
+    , binary "/"
+    ]
+  , [ binary "+"
+    , binary "-"
+    ]
+  ]
+
+symbol :: Text -> Parser Text
+symbol = L.symbol sc
+
+binary :: Text -> Operator Parser (Expr SourceSpan)
+binary name = InfixL (binaryExpr (unpack name) <$ symbol name)
+
+binaryExpr :: String -> Expr SourceSpan -> Expr SourceSpan -> Expr SourceSpan
+binaryExpr name a b = Expr undefined (Alias (Fixture name)) [a, b]
+
+prefix, postfix :: Text -> (String -> Expr SourceSpan -> Expr SourceSpan) -> Operator Parser (Expr SourceSpan)
+prefix name f = Prefix (f (unpack name) <$ symbol name)
+postfix name f = Postfix (f (unpack name) <$ symbol name)
+
+pTerm :: Parser (Expr SourceSpan)
+pTerm = withSourceSpan makeExpr $
+  try (do
     lOp <- pValue
     b <- tBinary
     rOp <- pValue
-    return (Alias b, [lOp, rOp])
-  )
+    return (Alias b, [lOp, rOp]))
+  <|> ((,) <$> pValue <*> many pValue)
   where
     makeExpr :: SourceSpan -> (Value SourceSpan, [Value SourceSpan]) -> Expr SourceSpan
     makeExpr span (f, us) = Expr span f us
@@ -110,7 +135,7 @@ pValue :: Parser (Value SourceSpan)
 pValue
   = Alias <$> tIdentifier
   <|> withSourceSpan Const pConst
-  <|> FnValue <$> pFn
+  <|> FnValue <$> encloseRound pFn
   <|> ExprValue <$> encloseRound pExpr
 
 pConst :: Parser Const
@@ -122,6 +147,11 @@ tBinary = L.lexeme sc $ withSourceSpan Identifier $ choice
   , "-" <$ string "-"
   , "*" <$ string "*"
   , "/" <$ string "/"
+  , "<" <$ string "<"
+  , "<=" <$ string "<="
+  , ">" <$ string ">"
+  , ">=" <$ string ">="
+  , "==" <$ string "=="
   ]
 
 tDef :: Parser ()

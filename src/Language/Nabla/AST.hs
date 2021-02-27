@@ -110,4 +110,3 @@ instance Eq (Identifier p) where
   (Fixture a) == (Fixture b) = a == b
   (Identifier _ a) == (Fixture b) = a == b
   (Fixture a) == (Identifier _ b) = a == b
-  _ == _ = False
