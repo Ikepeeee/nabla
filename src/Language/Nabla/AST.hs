@@ -12,6 +12,11 @@ data Type
   | TBool
   deriving (Eq)
 
+-- base type
+-- condition
+-- ex) { n : TNum | n > 0 }
+data Sieve = Sieve Type Expr deriving (Show, Eq)
+
 instance Show Type where
   show TNum = "Num"
   show TBool = "Bool"
@@ -20,7 +25,7 @@ instance Show Type where
           pp t = show t
 
 data Expr
-  = Num Int
+  = Num Integer
   | Bool Bool
   | Var String
   | Fun String Type Expr

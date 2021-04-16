@@ -17,26 +17,30 @@ type Parser = Parsec Void Text
 pFun :: Parser Expr
 pFun = do
   lexeme (char '\\')
+  lexeme (char '(')
   arg <- tIdent
   lexeme (char ':')
   t <- pType
+  lexeme (char ')')
   lexeme (string "->")
   Fun arg t <$> pExpr
 
-pTypedExpr :: Parser String -> Parser TypedExpr
-pTypedExpr pArg = TypedExpr <$> pExpr <*> optional (lexeme (string "::") *> pType)
+pTypedExpr :: Parser TypedExpr
+pTypedExpr = TypedExpr <$> pExpr <*> optional (lexeme (string ":") *> pType)
 
 pType :: Parser Type
-pType = choice
-  [ TNum <$ lexeme (string "Num")
-  , TBool <$ lexeme (string "Bool")
-  ]
-
--- pVariable :: Parser Expr
--- pVariable = Var <$> tIdent
+pType = do
+  ts <- choice
+    [ TNum <$ lexeme (string "Num")
+    , TBool <$ lexeme (string "Bool")
+    ] `sepBy1` lexeme (string "->")
+  return $ f ts
+  where
+    f [t] = t
+    f (t:ts) = TFun t (f ts)
 
 tIdent :: Parser String
-tIdent = lexeme ((:) <$> letterChar <*> many alphaNumChar <?> "variable")
+tIdent = lexeme ((:) <$> lowerChar  <*> many alphaNumChar <?> "variable")
 
 pNum :: Parser Expr
 pNum = Num <$> lexeme L.decimal
