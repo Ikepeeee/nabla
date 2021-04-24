@@ -1,8 +1,9 @@
 module Language.Nabla.TypeChecker where
 import Prelude hiding (lookup)
+import Data.SBV (symbolic)
 import Data.SBV.Dynamic
 import Control.Monad.State
-import Data.Map (empty, fromList, insert, lookup, Map)
+import Data.Map (empty, fromList, insert, lookup, Map, member, (!))
 import Language.Nabla.AST
 
 -- Type Environment
@@ -31,10 +32,39 @@ typeApp tf@(TFun t r) t'
   | t == t' = pure r
   | otherwise = Left $ "can't apply: (" <> show tf <> ") " <> show t'
 
+data SBVExpr
+  = SBVVal SVal
+  | SBVFun (SVal -> SBVExpr)
 
--- toSVal :: Expr -> SVal
--- toSVal (Num e) = svInteger KFloat e
--- toSVal (Bool e) = svBool e
--- toSVal (App (App (Var "+") v1) v2) = svPlus (toSVal v1) (toSVal v2)
--- toSVal (App (App (Var ">") v1) v2) = svGreaterThan (toSVal v1) (toSVal v2)
+instance Show SBVExpr where
+  show (SBVVal _) = "SBVVal"
+  show (SBVFun _) = "SBVFun"
 
+sbvBin :: (SVal -> SVal -> SVal) -> SBVExpr
+sbvBin bin = SBVFun $ \a -> SBVFun $ \b -> SBVVal $ bin a b
+
+toSBVExpr :: Map String SVal -> Expr -> Symbolic SBVExpr
+toSBVExpr _ (Num e) = pure $ SBVVal $ svInteger KFloat e
+toSBVExpr _ (Bool e) = pure $ SBVVal $ svBool e
+toSBVExpr svals (Fun argName t e) = do
+  a <- svNewVar (toKind t) argName
+  toSBVExpr (insert argName a svals) e
+toSBVExpr svals (App f' x') = do
+  (SBVFun f) <- toSBVExpr svals f'
+  (SBVVal x) <- toSBVExpr svals x'
+  return $ f x
+toSBVExpr svals (Var "+") = pure $ sbvBin svPlus
+toSBVExpr svals (Var ">") = pure $ sbvBin svGreaterThan
+toSBVExpr svals (Var ">=") = pure $ sbvBin svGreaterEq
+toSBVExpr svals (Var name) = pure $ SBVVal $ svals ! name
+
+toKind :: Type -> Kind
+toKind TNum = KFloat
+toKind TBool = KBool
+
+toSVal :: SBVExpr -> Symbolic SVal
+toSVal (SBVVal a) = pure a
+
+-- a = satWithAll [z3] $ do
+--   sbvExpr <- toSBVExpr empty $ Fun "a" TNum (App (App (Var ">=") (Var "a")) (Var "a"))
+--   toSVal sbvExpr

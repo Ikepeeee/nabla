@@ -12,12 +12,26 @@ packages:
   original:
     hackage: lens-4.19.2
 - completed:
-    hackage: sbv-8.7@sha256:e0de66613d866820b42ac86c7c7b7f8f331b8da4d4efa1a82125e877fadf69c8,23430
+    hackage: sbv-8.14@sha256:babe05354ed4e60212d50e72a1e3aeef0ba442b63b40c7bbfeef726eb7cf3527,29018
     pantry-tree:
-      size: 60968
-      sha256: 21b92190ed801035e06e13d4aa81d2442c0584384aa3e5dc0d73e4404a28f31f
+      size: 64237
+      sha256: 645e5ea7bed80bff98f8213469d404dc2f9a5059a59579ea7a66d72cdface8fb
   original:
-    hackage: sbv-8.7
+    hackage: sbv-8.14
+- completed:
+    hackage: libBF-0.6.2@sha256:7bffc0e4dbc9bd9e851ba5c29255b62fd2c288dbc9a401cd3761b740f013775e,1770
+    pantry-tree:
+      size: 760
+      sha256: ca11e64003b53b2586cf0015038587e1dc85f96aed22cce7480ff76568402370
+  original:
+    hackage: libBF-0.6.2
+- completed:
+    hackage: hashable-1.3.1.0@sha256:d965e098e06cc585b201da6137dcb31c40f35eb7a937b833903969447985c076,3784
+    pantry-tree:
+      size: 937
+      sha256: 8ea12ecf91a4d6fd1f1f885faec1b3eeb4baa0db27ccff49072cfdd0c15833ba
+  original:
+    hackage: hashable-1.3.1.0
 - completed:
     hackage: text-1.2.4.0@sha256:8c24450feb8e3bbb7ea3e17af24ef57e85db077c4bf53e5bcc345b283d1b1d5b,10081
     pantry-tree:
