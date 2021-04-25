@@ -26,7 +26,10 @@ pFun = do
   Fun arg t <$> pExpr
 
 pTypedExpr :: Parser TypedExpr
-pTypedExpr = TypedExpr <$> pExpr <*> optional (lexeme (string ":") *> pType)
+pTypedExpr = TypedExpr <$> pExpr <*> optional (lexeme (string ":") *> pSieve)
+
+pSieve :: Parser Sieve
+pSieve = Sieve <$> pExpr
 
 pType :: Parser Type
 pType = do

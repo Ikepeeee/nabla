@@ -10,5 +10,7 @@ import Language.Nabla.Fixture (fixtureTypeEnv)
 parseAndInfer :: String -> Either String Type
 parseAndInfer src =
   case parse pTypedExpr "test" (pack src) of
-    Right e -> valid fixtureTypeEnv e
+    Right e -> case valid fixtureTypeEnv e of
+      (Right t) -> pure t
+      (Left e) -> Left $ show e
     Left e -> Left $ errorBundlePretty e

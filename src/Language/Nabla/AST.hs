@@ -3,7 +3,7 @@ module Language.Nabla.AST where
 import Data.List (intercalate)
 
 data TypedExpr
-  = TypedExpr Expr (Maybe Type)
+  = TypedExpr Expr (Maybe Sieve)
   deriving (Eq, Show)
 
 data Type
@@ -15,7 +15,7 @@ data Type
 -- base type
 -- condition
 -- ex) { n : TNum | n > 0 }
-data Sieve = Sieve Type Expr deriving (Show, Eq)
+data Sieve = Sieve Expr deriving (Show, Eq)
 
 instance Show Type where
   show TNum = "Num"
