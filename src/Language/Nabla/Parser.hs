@@ -2,6 +2,7 @@
 
 module Language.Nabla.Parser where
 
+import Data.Scientific
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Data.Void
@@ -29,7 +30,15 @@ pTypedExpr :: Parser TypedExpr
 pTypedExpr = TypedExpr <$> pExpr <*> optional (lexeme (string ":") *> pSieve)
 
 pSieve :: Parser Sieve
-pSieve = Sieve <$> pExpr
+pSieve = Sieve <$> do
+  lexeme (char '{')
+  name <- tIdent
+  lexeme (char ':')
+  t <- pType
+  lexeme (char '|')
+  e <- pExpr
+  lexeme (char '}')
+  return $ Fun name t e
 
 pType :: Parser Type
 pType = do
@@ -46,7 +55,7 @@ tIdent :: Parser String
 tIdent = lexeme ((:) <$> lowerChar  <*> many alphaNumChar <?> "variable")
 
 pNum :: Parser Expr
-pNum = Num <$> lexeme L.decimal
+pNum = Num . toRealFloat <$> lexeme L.scientific
 
 pBool :: Parser Expr
 pBool = Bool <$> lexeme (choice [tTrue, tFalse])

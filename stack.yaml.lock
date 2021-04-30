@@ -74,6 +74,13 @@ packages:
       sha256: 68dcd6bab85df3c84a0f088624241be2867c94b0cdd76acd6e85c318e37be606
   original:
     hackage: hspec-discover-2.7.4
+- completed:
+    hackage: scientific-0.3.6.2@sha256:dd49abc76bd8e2b57e7a057dc2bb742a00527b4bf9350f9374be03b5934e55d8,4679
+    pantry-tree:
+      size: 656
+      sha256: d05b22ccd31ad7a4438d9217bf44771ac63c4eeb0acc9c624465044e5894766a
+  original:
+    hackage: scientific-0.3.6.2
 snapshots:
 - completed:
     size: 523878

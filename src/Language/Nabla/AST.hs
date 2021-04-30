@@ -25,7 +25,7 @@ instance Show Type where
           pp t = show t
 
 data Expr
-  = Num Integer
+  = Num Double
   | Bool Bool
   | Var String
   | Fun String Type Expr

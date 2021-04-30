@@ -6,7 +6,6 @@ import Data.SBV.Dynamic
 import Control.Monad.State
 import Data.Map (empty, fromList, insert, lookup, Map, member, (!))
 import Language.Nabla.AST
-
 -- Type Environment
 type TypeEnv = Map String Type
 
@@ -61,21 +60,23 @@ instance Show SBVExpr where
   show (SBVVal _) = "SBVVal"
   show (SBVFun _) = "SBVFun"
 
+sbvUnary :: (SVal -> SVal) -> SBVExpr
+sbvUnary unary = SBVFun $ \a -> SBVVal $ unary a
+
 sbvBin :: (SVal -> SVal -> SVal) -> SBVExpr
 sbvBin bin = SBVFun $ \a -> SBVFun $ \b -> SBVVal $ bin a b
 
 toSBVExpr :: Map String SVal -> Expr -> SBVExpr
-toSBVExpr _ (Num e) = SBVVal $ svInteger KFloat e
+toSBVExpr _ (Num e) = SBVVal $ svDouble e
 toSBVExpr _ (Bool e) = SBVVal $ svBool e
 toSBVExpr svals (Fun argName t e) = SBVFun $ \a -> toSBVExpr (insert argName a svals) e
 toSBVExpr svals (App f' x') = do
   let (SBVFun f) = toSBVExpr svals f'
   let (SBVVal x) = toSBVExpr svals x'
   f x
-toSBVExpr svals (Var "+") = sbvBin svPlus
-toSBVExpr svals (Var ">") = sbvBin svGreaterThan
-toSBVExpr svals (Var ">=") = sbvBin svGreaterEq
-toSBVExpr svals (Var name) = SBVVal $ svals ! name
+toSBVExpr svals (Var name)
+  | member name fixtureSBVExpr = fixtureSBVExpr ! name
+  | otherwise = SBVVal $ svals ! name
 
 toKind :: Type -> Kind
 toKind TNum = KFloat
@@ -83,6 +84,23 @@ toKind TBool = KBool
 
 toSVal :: SBVExpr -> SVal
 toSVal (SBVVal a) = a
+
+fixtureSBVExpr :: Map String SBVExpr
+fixtureSBVExpr = fromList
+  [ ("+", sbvBin svPlus)
+  , ("-", sbvBin svMinus)
+  , ("*", sbvBin svTimes)
+  , ("/", sbvBin svDivide)
+  , (">", sbvBin svGreaterThan)
+  , (">=", sbvBin svGreaterEq)
+  , ("<", sbvBin svLessThan)
+  , ("<=", sbvBin svLessEq)
+  , ("&&", sbvBin svAnd)
+  , ("||", sbvBin svOr)
+  , ("[unary]-", sbvUnary svUNeg)
+  , ("[unary]+", sbvUnary svAbs)
+  , ("[unary]!", sbvUnary svNot)
+  ]
 
 a = proveWithAny [z3] $ do
   let sbvExpr = toSBVExpr empty $ App (Fun "a" TNum (App (App (Var ">=") (Var "a")) (Var "a"))) (Num 1)
