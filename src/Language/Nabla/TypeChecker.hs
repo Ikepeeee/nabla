@@ -6,6 +6,8 @@ import Data.SBV.Dynamic
 import Control.Monad.State
 import Data.Map (empty, fromList, insert, lookup, Map, member, (!))
 import Language.Nabla.AST
+import Debug.Trace
+
 -- Type Environment
 type TypeEnv = Map String Type
 
@@ -25,12 +27,16 @@ instance Show TypeError where
 valid :: TypeEnv -> TypedExpr -> Either TypeError Type
 valid env (TypedExpr e Nothing) = infer env e
 valid env (TypedExpr e (Just sieve@(Sieve sf@(Fun _ t e')))) = do
+  sieveType <- infer env sf -- sieve is t -> Bool
+  if sieveType /= TFun t TBool
+    then Left $ UnmatchableTypeError sf (TFun t TBool)
+    else pure ()
   t' <- infer env e
   if t == t'
     then pure t
     else Left $ UnmatchableTypeError e t
   let (SBVFun f) = toSBVExpr empty sf
-  let (SBVVal x) = toSBVExpr empty e
+  let x = toSBVExpr empty e
   let (SBVVal r) = f x
   let (_, _, ThmResult result) = unsafePerformIO $ proveWithAny [z3] (pure r)
   case result of
@@ -54,29 +60,29 @@ typeApp tf@(TFun t r) t'
 
 data SBVExpr
   = SBVVal SVal
-  | SBVFun (SVal -> SBVExpr)
+  | SBVFun (SBVExpr -> SBVExpr)
 
 instance Show SBVExpr where
   show (SBVVal _) = "SBVVal"
   show (SBVFun _) = "SBVFun"
 
 sbvUnary :: (SVal -> SVal) -> SBVExpr
-sbvUnary unary = SBVFun $ \a -> SBVVal $ unary a
+sbvUnary unary = SBVFun $ \(SBVVal a) -> SBVVal $ unary a
 
 sbvBin :: (SVal -> SVal -> SVal) -> SBVExpr
-sbvBin bin = SBVFun $ \a -> SBVFun $ \b -> SBVVal $ bin a b
+sbvBin bin = SBVFun $ \(SBVVal a) -> SBVFun $ \(SBVVal b) -> SBVVal $ bin a b
 
-toSBVExpr :: Map String SVal -> Expr -> SBVExpr
+toSBVExpr :: Map String SBVExpr -> Expr -> SBVExpr
 toSBVExpr _ (Num e) = SBVVal $ svDouble e
 toSBVExpr _ (Bool e) = SBVVal $ svBool e
 toSBVExpr svals (Fun argName t e) = SBVFun $ \a -> toSBVExpr (insert argName a svals) e
 toSBVExpr svals (App f' x') = do
   let (SBVFun f) = toSBVExpr svals f'
-  let (SBVVal x) = toSBVExpr svals x'
+  let x = toSBVExpr svals x'
   f x
 toSBVExpr svals (Var name)
   | member name fixtureSBVExpr = fixtureSBVExpr ! name
-  | otherwise = SBVVal $ svals ! name
+  | otherwise = svals ! name
 
 toKind :: Type -> Kind
 toKind TNum = KFloat
@@ -95,6 +101,7 @@ fixtureSBVExpr = fromList
   , (">=", sbvBin svGreaterEq)
   , ("<", sbvBin svLessThan)
   , ("<=", sbvBin svLessEq)
+  , ("==", sbvBin svEqual)
   , ("&&", sbvBin svAnd)
   , ("||", sbvBin svOr)
   , ("[unary]-", sbvUnary svUNeg)
@@ -105,3 +112,6 @@ fixtureSBVExpr = fromList
 a = proveWithAny [z3] $ do
   let sbvExpr = toSBVExpr empty $ App (Fun "a" TNum (App (App (Var ">=") (Var "a")) (Var "a"))) (Num 1)
   pure $ toSVal sbvExpr
+
+trace' :: Show a => a -> a
+trace' m = trace (show m) m

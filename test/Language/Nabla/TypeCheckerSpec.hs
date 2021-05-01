@@ -18,4 +18,18 @@ spec = do
     it "'0.5 : { n : Num | 0 <= n && n <= 1 }' is OK"
       $ valid fixtureTypeEnv (TypedExpr (Num 0.5) (Just $ rangeSieve 0 1))
         `shouldBe` Right TNum
-
+    it "'2 : { n : Num | 0 <= n && n <= 1 }' is NG"
+      $ valid fixtureTypeEnv (TypedExpr (Num 2) (Just $ rangeSieve 0 1))
+        `shouldBe` Left (UnmatchableSieveError (Num 2) (rangeSieve 0 1))
+    it "'1 + 1 : { n : Num | n >= 0 }' is OK"
+      $ valid fixtureTypeEnv (TypedExpr (app2 (Var "+") n1 n1) (Just posSieve))
+        `shouldBe` Right TNum
+    it "'1 - 2 : { n : Num | n >= 0 }' is NG"
+      $ valid fixtureTypeEnv (TypedExpr (app2 (Var "-") n1 (Num 2)) (Just posSieve))
+        `shouldBe` Left (UnmatchableSieveError (app2 (Var "-") n1 (Num 2)) posSieve)
+    it "'\\n : Num -> n + 1 : { f : Num -> Num | f 2 == 3 }' is OK"
+      $ valid fixtureTypeEnv (TypedExpr (Fun "n" TNum (app2 (Var "+") (Var "n") (Num 1))) (Just $ Sieve (Fun "f" (TFun TNum TNum) (app2 (Var "==") (App (Var "f") (Num 2)) (Num 3)))))
+        `shouldBe` Right (TFun TNum TNum)
+    it "'\\n : Num -> n + 1 : Num -> { n : Num -> Num | f 2 == 4 }' is NG"
+      $ valid fixtureTypeEnv (TypedExpr (Fun "n" TNum (app2 (Var "+") (Var "n") (Num 1))) (Just $ Sieve (Fun "f" (TFun TNum TNum) (app2 (Var "==") (App (Var "f") (Num 2)) (Num 4)))))
+        `shouldBe` Left (UnmatchableSieveError (Fun "n" TNum (app2 (Var "+") (Var "n") (Num 1))) (Sieve (Fun "f" (TFun TNum TNum) (app2 (Var "==") (App (Var "f") (Num 2)) (Num 4)))))
