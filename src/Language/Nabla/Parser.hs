@@ -18,19 +18,15 @@ type Parser = Parsec Void Text
 pFun :: Parser Expr
 pFun = do
   lexeme (char '\\')
-  lexeme (char '(')
   arg <- tIdent
-  lexeme (char ':')
-  t <- pType
-  lexeme (char ')')
   lexeme (string "->")
-  Fun arg t <$> pExpr
+  Fun arg <$> pExpr
 
 pTypedExpr :: Parser TypedExpr
 pTypedExpr = TypedExpr <$> pExpr <*> optional (lexeme (string ":") *> pSieve)
 
 pSieve :: Parser Sieve
-pSieve = Sieve <$> do
+pSieve = do
   lexeme (char '{')
   name <- tIdent
   lexeme (char ':')
@@ -38,7 +34,7 @@ pSieve = Sieve <$> do
   lexeme (char '|')
   e <- pExpr
   lexeme (char '}')
-  return $ Fun name t e
+  return $ Sieve t (Fun name e)
 
 pType :: Parser Type
 pType = do
