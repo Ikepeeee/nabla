@@ -1,7 +1,6 @@
 module Language.Nabla.AST where
 
 import Data.List (intercalate)
-import Data.UUID (UUID)
 
 data TypedExpr
   = TypedExpr Expr (Maybe Sieve)
@@ -11,7 +10,7 @@ data Type
   = TFun Type Type
   | TNum
   | TBool
-  | TVar UUID
+  | TVar Int
   deriving (Eq)
 
 -- base type
@@ -25,7 +24,7 @@ instance Show Type where
   show (TFun p e) = pp p ++ " -> " ++ show e
     where pp fun@(TFun _ _) = "(" ++ show fun ++ ")"
           pp t = show t
-  show (TVar id) = "Var-" <> show id
+  show (TVar id) = "T" <> show id
 
 data Expr
   = Num Double

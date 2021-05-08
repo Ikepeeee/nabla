@@ -3,14 +3,12 @@
 module Language.Nabla.TypeChecker where
 import Prelude hiding (lookup, filter)
 import System.IO.Unsafe
-import Data.UUID
-import Data.UUID.V4
 import Data.SBV (symbolic)
 import Data.SBV.Dynamic
 import Control.Monad.State.Lazy
 import Control.Monad.Except
 import Control.Monad.Identity
-import Data.Map (empty, fromList, insert, lookup, Map, member, (!), filter, toList, findWithDefault)
+import Data.Map (empty, fromList, insert, lookup, Map, member, (!), filter, toList, findWithDefault, elems)
 import Language.Nabla.AST
 import Debug.Trace
 
@@ -73,7 +71,8 @@ infer' (Var x) = do
     Nothing -> throwError $ NotFoundVarError x
 infer' (Fun parm e) = do
   env <- get
-  let argType = findWithDefault createTVar parm env
+  var <- createTVar
+  let argType = findWithDefault var parm env
   modify $ insert parm argType
   retType <- infer' e
   env <- get
@@ -97,10 +96,10 @@ unify t1 t2
   | t1 == t2  = return ()
   | otherwise = throwError $ CannotUnify t1 t2
 
-unifyVar :: UUID -> Type -> Infer ()
+unifyVar :: Int -> Type -> Infer ()
 unifyVar id type2 = do
   env <- get
-  let types = toList $ filter (byUUID id) env
+  let types = toList $ filter (byID id) env
   case types of
     [(name, type1)] -> do
       map <- get
@@ -117,9 +116,9 @@ isTVar :: Type -> Bool
 isTVar (TVar _) = True
 isTVar _ = False
 
-byUUID :: UUID -> Type -> Bool
-byUUID id (TVar id') = id == id'
-byUUID _ _ = False
+byID :: Int -> Type -> Bool
+byID id (TVar id') = id == id'
+byID _ _ = False
 
 typeApp :: Type -> Type -> Infer Type
 typeApp (TFun t r) t'
@@ -157,8 +156,11 @@ toSBVExpr svals (Var name)
 toSVal :: SBVExpr -> SVal
 toSVal (SBVVal a) = a
 
-createTVar :: Type
-createTVar = TVar $ unsafePerformIO nextRandom
+createTVar :: Infer Type
+createTVar = do
+  env <- get
+  let ns = map (\(TVar n) -> n) $ elems $ filter isTVar env
+  pure $ TVar $ maximum (0:ns) + 1
 
 fixtureSBVExpr :: Map String SBVExpr
 fixtureSBVExpr = fromList

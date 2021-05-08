@@ -81,20 +81,6 @@ packages:
       sha256: d05b22ccd31ad7a4438d9217bf44771ac63c4eeb0acc9c624465044e5894766a
   original:
     hackage: scientific-0.3.6.2
-- completed:
-    hackage: uuid-1.3.15@sha256:9444467f4104f5af6c0c29e5082f924750d1c4617a08461b0a4eaa490a1a28d2,2561
-    pantry-tree:
-      size: 739
-      sha256: 6751a9238a77808920fde96fc50a87770f0c7127f706b74cedb70721cc5650be
-  original:
-    hackage: uuid-1.3.15
-- completed:
-    hackage: uuid-types-1.0.5@sha256:5031383749d57cb95877d7e56f0300be66652b6e57f5ba6681dcc6e4f78d046d,2541
-    pantry-tree:
-      size: 480
-      sha256: e11a2bc87a8c811480a62f6cf08a2e53480b468b0fdf6fbe1c063f207b6aa796
-  original:
-    hackage: uuid-types-1.0.5
 snapshots:
 - completed:
     size: 523878

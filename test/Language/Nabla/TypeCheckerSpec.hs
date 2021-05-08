@@ -15,8 +15,8 @@ spec = do
       $ infer fixtureTypeEnv (Fun "n" (app2 (Var "+") (Num 1) (Var "n"))) `shouldBe` Right (TFun TNum TNum)
     it "\\n -> n + 1 is Num -> Num"
       $ infer fixtureTypeEnv (Fun "n" (app2 (Var "+") (Var "n") (Num 1))) `shouldBe` Right (TFun TNum TNum)
-    -- it "\\a -> a is Var -> Var"
-    --   $ infer fixtureTypeEnv (Fun "a" (Var "a")) `shouldBe` Right (TFun (TVar undefined) (TVar undefined))
+    it "\\a -> a is T -> T"
+      $ infer fixtureTypeEnv (Fun "a" (Var "a")) `shouldBe` Right (TFun (TVar 1) (TVar 1))
     -- it "(\\a -> a) 1 is Num"
     --   $ infer fixtureTypeEnv (App (Fun "a" (Var "a")) (Num 1)) `shouldBe` Right TNum
   describe "valid function" $ do
