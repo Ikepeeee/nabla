@@ -43,7 +43,7 @@ valid' (TypedExpr e Nothing) = infer' e
 valid' (TypedExpr e (Just sieve@(Sieve t sf@(Fun arg e')))) = do
   modify $ insert arg t
   sieveType <- infer' sf -- sieve is t -> Bool
-  if trace' "sieveType' =" sieveType /= TFun t TBool
+  if sieveType /= TFun t TBool
     then throwError $ UnmatchableTypeError sf (TFun t TBool)
     else pure ()
   t' <- infer' e
