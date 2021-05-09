@@ -20,6 +20,7 @@ data TypeError
   | UnmatchableSieveError Expr Sieve
   | UnapplicableTypeError Type Type
   | NotFoundVarError String
+  | NotFoundTypeVarError Int
   | CannotUnify Type Type
   deriving (Eq)
 
@@ -30,6 +31,7 @@ instance Show TypeError where
   show (UnmatchableTypeError e t) = show e <> " is not " <> show t
   show (UnmatchableSieveError e s) = show e <> " is not " <> show s
   show (UnapplicableTypeError tf t) = "can't apply: (" <> show tf <> ") " <> show t
+  show (NotFoundTypeVarError id) = "T" <> show id <> " is not found"
   show (NotFoundVarError name) = "not found: " ++ name
 
 evalInfer :: TypeEnv -> Infer a -> Either TypeError a
@@ -87,7 +89,6 @@ infer' (App f arg) = do
 unify :: Type -> Type -> Infer ()
 unify (TFun p1 e1) (TFun p2 e2) = do
   unify p1 p2
-  unify e1 e2
 unify t1@(TVar i1) t2@(TVar i2)
   | i1 == i2  = return ()
 unify (TVar i1) t2 = unifyVar i1 t2
@@ -97,20 +98,14 @@ unify t1 t2
   | otherwise = throwError $ CannotUnify t1 t2
 
 unifyVar :: Int -> Type -> Infer ()
-unifyVar id type2 = do
+unifyVar id t = do
   env <- get
   let types = toList $ filter (byID id) env
   case types of
-    [(name, type1)] -> do
+    [(name, _)] -> do
       map <- get
-      -- if not isTVar type1 && not isTVar type2
-      if isTVar type1
-        then modify $ insert name type2
-        else
-          if isTVar type2
-          then modify $ insert name type1
-          else unify type1 type2
-    _ -> error "occurs error"
+      modify $ insert name t
+    _ -> throwError $ NotFoundTypeVarError id
 
 isTVar :: Type -> Bool
 isTVar (TVar _) = True
@@ -121,12 +116,21 @@ byID id (TVar id') = id == id'
 byID _ _ = False
 
 typeApp :: Type -> Type -> Infer Type
-typeApp (TFun t r) t'
-  | t == t' = pure r
-  | isTVar t' = pure r
-  | otherwise = throwError $ UnapplicableTypeError t t'
-typeApp t t' = throwError $ UnapplicableTypeError t t'
+typeApp (TFun paramType retType) argType
+  | paramType == argType = pure retType
+  | isTVar argType = pure retType
+  | isTVar paramType = pure $ appInstance paramType argType retType
+  | otherwise = throwError $ UnapplicableTypeError paramType argType
+typeApp paramType argType = throwError $ UnapplicableTypeError paramType argType
 
+-- Replace a type variable to instance type
+-- appInstance T1 Num (T1 -> T2) == Num -> T2
+appInstance :: Type -> Type -> Type -> Type
+appInstance tgtType insType (TFun paramType retType)
+  = TFun (appInstance tgtType insType paramType) (appInstance tgtType insType retType)
+appInstance tgtType insType retType
+  | retType == tgtType = insType
+  | otherwise = retType
 data SBVExpr
   = SBVVal SVal
   | SBVFun (SBVExpr -> SBVExpr)
