@@ -5,7 +5,6 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.SBV
-import Data.SBV.Dynamic
 import Data.Void
 import Data.Scientific (toRealFloat)
 import Control.Monad.Trans (MonadTrans(lift))
@@ -23,7 +22,7 @@ execFun src = do
 
 runFun :: String -> IO ThmResult
 runFun src = do
-  prove $ execFun src
+  proveWith z3 $ execFun src -- cvc4 or mathsat or z3
 
 pFun :: Parser SBool
 pFun = do
@@ -33,7 +32,7 @@ pFun = do
   lexeme $ char ')'
   let premises = snds args
   lexeme $ string "->"
-  expr <- pExpr (fsts args)
+  expr <- pCondExpr (fsts args)
   lexeme $ string ":"
   cond <- pSieve expr
   pure $ foldr (.&&) sTrue premises .=> cond
@@ -57,9 +56,23 @@ pSieve v = do
   lexeme $ char '{'
   argName <- tIdent
   lexeme $ char '|'
-  expr <- pCompExpr [(argName, v)]
+  expr <- pLogicExpr [(argName, v)]
   lexeme $ char '}'
   pure expr
+
+pLogicExpr :: [(String, SDouble)] -> Parser SBool
+pLogicExpr vars = try (do
+  a <- pCompExpr vars
+  op <- logicOp
+  b <- pCompExpr vars
+  pure $ op a b)
+  <|> pCompExpr vars
+
+logicOp :: Parser (SBool -> SBool -> SBool)
+logicOp = lexeme $ choice
+  [ (.&&) <$ string "&&"
+  , (.||) <$ string "||"
+  ]
 
 pCompExpr :: [(String, SDouble)] -> Parser SBool
 pCompExpr vars = do
@@ -71,11 +84,21 @@ pCompExpr vars = do
 compOp :: Parser (SDouble -> SDouble -> SBool)
 compOp = lexeme $ choice
   [ (.>=) <$ string ">="
-  , (.>) <$ string ">"
-  , (.<) <$ string "<"
   , (.<=) <$ string "<="
   , (.==) <$ string "=="
+  , (.>) <$ string ">"
+  , (.<) <$ string "<"
   ]
+
+pCondExpr :: [(String, SDouble)] -> Parser SDouble
+pCondExpr vars = try (do
+  c <- pLogicExpr vars
+  lexeme $ char '?'
+  t <- pExpr vars
+  lexeme $ char ':'
+  f <- pExpr vars
+  pure $ ite c t f)
+  <|> pExpr vars
 
 pExpr :: [(String, SDouble)] -> Parser SDouble
 pExpr vars
@@ -96,10 +119,13 @@ pTerm vars
   <|> pNum vars
 
 pNum :: [(String, SDouble)] -> Parser SDouble
-pNum vars = L.signed sc (lexeme (literal . toRealFloat <$> L.scientific))
+pNum vars = pNum'
   <|> do
     v <- tIdent
     pure (fromJust $ lookup v vars)
+  where
+    pNum' :: Parser SDouble
+    pNum' = L.signed sc (lexeme $ literal . toRealFloat <$> L.scientific)
 
 exprOp :: Parser (SDouble -> SDouble -> SDouble)
 exprOp = lexeme $ choice
@@ -110,6 +136,7 @@ exprOp = lexeme $ choice
 termOp :: Parser (SDouble -> SDouble -> SDouble)
 termOp = lexeme $ choice
   [ (*) <$ char '*'
+  , (/) <$ char '/'
   ]
 
 tIdent :: Parser String
