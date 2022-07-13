@@ -4,39 +4,26 @@ module Language.Experiment.Parser where
 
 import Control.Monad.Trans (MonadTrans (lift))
 import Data.Maybe (fromJust)
-import Data.SBV
 import Data.Scientific (toRealFloat)
 import Data.Void
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+import Language.Experiment.AST
 
-type Parser = ParsecT Void String Symbolic
+type Parser = Parsec Void String
 
-execFun :: String -> Symbolic SBool
-execFun src = do
-  ret <- runParserT pFun "test" src
-  case ret of
-    Right b -> pure b
-    Left e -> error $ errorBundlePretty e
-
-runFun :: String -> IO ThmResult
-runFun src = do
-  proveWith z3 $ execFun src -- cvc4 or mathsat or z3
-
-pFun :: Parser SBool
+pFun :: Parser NFunc
 pFun = do
   name <- tIdent
   lexeme $ char '('
   args <- pArg `sepBy` lexeme (char ',')
   lexeme $ char ')'
-  let premises = snds args
   lexeme $ string "->"
-  expr <- pCondExpr (fsts args)
+  expr <- pCondExpr
   lexeme $ string ":"
-  cond <- pSieve expr
-  pure $ foldr (.&&) sTrue premises .=> cond
+  NFunc args expr <$> pSieve
 
 fsts :: [(a, b)] -> [a]
 fsts vs = map fst vs
@@ -44,119 +31,110 @@ fsts vs = map fst vs
 snds :: [(a, b)] -> [b]
 snds vs = map snd vs
 
-pArg :: Parser ((String, SDouble), SBool)
+pArg :: Parser NArg
 pArg = do
   arg <- tIdent
   lexeme $ string ":"
-  a <- lift $ sDouble arg
-  premise <- pSieve a
-  pure ((arg, a), premise)
+  premise <- pSieve
+  pure $ NArg arg premise
 
-pSieve :: SDouble -> Parser SBool
-pSieve v = do
+pSieve :: Parser NBool
+pSieve = do
   lexeme $ char '{'
   argName <- tIdent
   lexeme $ char '|'
-  expr <- pLogicExpr [(argName, v)]
+  expr <- pLogicExpr
   lexeme $ char '}'
   pure expr
 
-pLogicExpr :: [(String, SDouble)] -> Parser SBool
-pLogicExpr vars =
+pLogicExpr :: Parser NBool
+pLogicExpr =
   try
     ( do
-        a <- pCompExpr vars
+        a <- pCompExpr
         op <- logicOp
-        b <- pCompExpr vars
-        pure $ op a b
+        op a <$> pCompExpr
     )
-    <|> pCompExpr vars
+    <|> pCompExpr
 
-logicOp :: Parser (SBool -> SBool -> SBool)
-logicOp = lexeme $ choice [(.&&) <$ string "&&", (.||) <$ string "||"]
+logicOp :: Parser (NBool -> NBool -> NBool)
+logicOp = lexeme $ choice [NAnd <$ string "&&", NOr <$ string "||"]
 
-pCompExpr :: [(String, SDouble)] -> Parser SBool
-pCompExpr vars = do
-  a <- pTerm vars
+pCompExpr :: Parser NBool
+pCompExpr = do
+  a <- pTerm
   op <- compOp
-  b <- pTerm vars
-  pure $ op a b
+  op a <$> pTerm
 
-compOp :: Parser (SDouble -> SDouble -> SBool)
+compOp :: Parser (NDouble -> NDouble -> NBool)
 compOp =
   lexeme $
     choice
-      [ (.>=) <$ string ">=",
-        (.<=) <$ string "<=",
-        (.==) <$ string "==",
-        (./=) <$ string "!=",
-        (.>) <$ string ">",
-        (.<) <$ string "<"
+      [ NGe <$ string ">=",
+        NLe <$ string "<=",
+        NEq <$ string "==",
+        NNeq <$ string "!=",
+        NGt <$ string ">",
+        NLt <$ string "<"
       ]
 
-pCondExpr :: [(String, SDouble)] -> Parser SDouble
-pCondExpr vars =
+pCondExpr :: Parser NDouble
+pCondExpr =
   try
     ( do
-        c <- pLogicExpr vars
+        c <- pLogicExpr
         lexeme $ char '?'
-        t <- pExpr vars
+        t <- pExpr
         lexeme $ char ':'
-        f <- pExpr vars
-        pure $ ite c t f
+        f <- pExpr
+        pure $ NIte c t f
     )
-    <|> pExpr vars
+    <|> pExpr
 
-pExpr :: [(String, SDouble)] -> Parser SDouble
-pExpr vars =
+pExpr :: Parser NDouble
+pExpr =
   try
     ( do
-        a <- pTerm vars
+        a <- pTerm
         op <- exprOp
-        b <- pExpr vars
-        pure $ op a b
+        op a <$> pExpr
     )
-    <|> pTerm vars
+    <|> pTerm
 
-pTerm :: [(String, SDouble)] -> Parser SDouble
-pTerm vars =
+pTerm :: Parser NDouble
+pTerm =
   try
-    ( do
-        a <- pNum vars
+    (do
+        a <- pNum
         op <- termOp
-        b <- pTerm vars
-        pure $ op a b
+        op a <$> pTerm
     )
-    <|> pNum vars
+    <|> pNum
 
-pNum :: [(String, SDouble)] -> Parser SDouble
-pNum vars =
+pNum :: Parser NDouble
+pNum =
   pNum'
-    <|> do
-      v <- tIdent
-      pure (fromJust $ lookup v vars)
+    <|> do NDoubleVar <$> tIdent
   where
-    pNum' :: Parser SDouble
-    pNum' = L.signed sc (lexeme $ literal . toRealFloat <$> L.scientific)
+    pNum' :: Parser NDouble
+    pNum' = NDouble <$> L.signed sc (lexeme $ toRealFloat <$> L.scientific)
 
-exprOp :: Parser (SDouble -> SDouble -> SDouble)
-exprOp = lexeme $ choice [(+) <$ char '+', (-) <$ char '-']
+exprOp :: Parser (NDouble -> NDouble -> NDouble)
+exprOp = lexeme $ choice [NAdd <$ char '+', NSub <$ char '-']
 
-termOp :: Parser (SDouble -> SDouble -> SDouble)
+termOp :: Parser (NDouble -> NDouble -> NDouble)
 termOp =
   lexeme $
     choice
-      [ (*) <$ char '*',
-        (/) <$ char '/',
-        smin <$ string "min",
-        smax <$ string "max"
+      [ NMul <$ char '*',
+        NDiv <$ char '/'
       ]
 
-toInt :: SDouble -> SInteger
-toInt = fromSDouble sRoundTowardZero . fpRoundToIntegral sRoundTowardZero
+-- toInt :: NDouble -> SInteger
+-- toInt = fromNDouble sRoundTowardZero . fpRoundToIntegral sRoundTowardZero
 
-toDouble :: SInteger -> SDouble
-toDouble = toSDouble sRoundTowardZero
+-- toDouble :: SInteger -> NDouble
+-- toDouble = toNDouble sRoundTowardZero
 
 tIdent :: Parser String
 tIdent = lexeme ((:) <$> lowerChar <*> many alphaNumChar <?> "variable")
