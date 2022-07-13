@@ -23,12 +23,21 @@ _toSBool :: [(String, SDouble)] -> NBool -> Symbolic SBool
 _toSBool _ (NBool True) = pure sTrue
 _toSBool _ (NBool False) = pure sFalse
 _toSBool args (NAnd a b) = (.&&) <$> _toSBool args a <*> _toSBool args b
+_toSBool args (NOr a b) = (.||) <$> _toSBool args a <*> _toSBool args b
+_toSBool args (NNot a) = sNot <$> _toSBool args a
 _toSBool args (NLe a b) = (.<=) <$> _toSDouble args a <*> _toSDouble args b
-
+_toSBool args (NLt a b) = (.<) <$> _toSDouble args a <*> _toSDouble args b
+_toSBool args (NGe a b) = (.>=) <$> _toSDouble args a <*> _toSDouble args b
+_toSBool args (NGt a b) = (.>) <$> _toSDouble args a <*> _toSDouble args b
+_toSBool args (NEq a b) = (.==) <$> _toSDouble args a <*> _toSDouble args b
+_toSBool args (NNeq a b) = (./=) <$> _toSDouble args a <*> _toSDouble args b
 
 _toSDouble :: [(String, SDouble)] -> NDouble -> Symbolic SDouble
 _toSDouble _ (NDouble v) = pure $ literal v
 _toSDouble args (NDoubleVar name) = pure $ fromJust $ lookup name args
+_toSDouble args (NMinus a) = (* (-1.0)) <$> _toSDouble args a
 _toSDouble args (NAdd a b) = (+) <$> _toSDouble args a <*> _toSDouble args b
 _toSDouble args (NSub a b) = (-) <$> _toSDouble args a <*> _toSDouble args b
 _toSDouble args (NMul a b) = (*) <$> _toSDouble args a <*> _toSDouble args b
+_toSDouble args (NDiv a b) = (/) <$> _toSDouble args a <*> _toSDouble args b
+_toSDouble args (NIte c a b) = ite <$> _toSBool args c <*> _toSDouble args a <*> _toSDouble args b
