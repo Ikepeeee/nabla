@@ -9,19 +9,10 @@ createCond :: NFunc -> Symbolic SBool
 createCond (NFunc args body condArg _ cond) = do
   sArgs <- mapM createSArg args
   let sArgs' = map fst sArgs
-  let t = infer sArgs' body
-  case t of
-    "Double" -> do
-      (SXDouble sBody) <- _toSX sArgs' body
-      (SXBool sCond) <- _toSX [(condArg, SXDouble sBody)] cond
-      let sArgConds = map snd sArgs
-      pure $ foldr (.&&) sTrue sArgConds .=> sCond
-    "Bool" -> do
-      (SXBool sBody) <- _toSX sArgs' body
-      (SXBool sCond) <- _toSX [(condArg, SXBool sBody)] cond
-      let sArgConds = map snd sArgs
-      pure $ foldr (.&&) sTrue sArgConds .=> sCond
-    _ -> undefined
+  sBody <- _toSX sArgs' body
+  (SXBool sCond) <- _toSX [(condArg, sBody)] cond
+  let sArgConds = map snd sArgs
+  pure $ foldr (.&&) sTrue sArgConds .=> sCond
 
 createSArg :: NArg -> Symbolic ((String, SX), SBool)
 createSArg (NArg name typeName cond) = do
