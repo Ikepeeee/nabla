@@ -47,7 +47,7 @@ pSieve = do
   pure (argName, t, expr)
 
 pExpr :: Parser NValue
-pExpr = makeExprParser pTerm operatorTable
+pExpr = makeExprParser pTerm operatorTable <?> "expression"
 
 operatorTable :: [[Operator Parser NValue]]
 operatorTable =
@@ -86,7 +86,7 @@ pTerm = choice
   , pBool
   , pString
   , pRegex
-  ]
+  ] <?> "term"
 
 binary :: String -> (NValue -> NValue -> NValue) -> Operator Parser NValue
 binary  name f = InfixL  (f <$ lexeme (string name))
@@ -96,19 +96,19 @@ prefix  name f = Prefix  (f <$ lexeme (string name))
 postfix name f = Postfix (f <$ lexeme (string name))
 
 pBool :: Parser NValue
-pBool = lexeme $ choice
+pBool = lexeme (choice
   [ NBool True <$ string "True"
   , NBool False <$ string "False"
-  ]
+  ] <?> "bool")
 
 pRegex :: Parser NValue
-pRegex = NRegex <$> lexeme (char '/' *> manyTill L.charLiteral (char '/'))
+pRegex = NRegex <$> lexeme (char '/' *> manyTill L.charLiteral (char '/')) <?> "regex"
 
 pString :: Parser NValue
-pString = NString <$> lexeme (char '\'' *> manyTill L.charLiteral (char '\''))
+pString = NString <$> lexeme (char '\'' *> manyTill L.charLiteral (char '\'')) <?> "string"
 
 pNum :: Parser NValue
-pNum = NDouble <$> L.signed sc (lexeme $ toRealFloat <$> L.scientific)
+pNum = NDouble <$> L.signed sc (lexeme $ toRealFloat <$> L.scientific) <?> "double"
 
 pIdent :: Parser NValue
 pIdent = NVar <$> tIdent
