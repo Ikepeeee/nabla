@@ -9,7 +9,7 @@ createCond :: NFunc -> Symbolic SBool
 createCond (NFunc args body condArg _ cond) = do
   sArgs <- mapM createSArg args
   let sArgs' = map fst sArgs
-  let t = infer body
+  let t = infer sArgs' body
   case t of
     "Double" -> do
       (SXDouble sBody) <- _toSX sArgs' body
@@ -36,25 +36,29 @@ createSArg (NArg name typeName cond) = do
       pure ((name, SXBool v), c)
     _ -> undefined
 
-infer :: NValue -> String
-infer (NDouble _) = "Double"
-infer (NBool _) = "Bool"
-infer (NVar _) = undefined
-infer NIte {} = "Double"
-infer (NBin "+" _ _) = "Double"
-infer (NBin "-" _ _) = "Double"
-infer (NBin "*" _ _) = "Double"
-infer (NBin "/" _ _) = "Double"
-infer (NBin ">=" _ _) = "Bool"
-infer (NBin ">" _ _) = "Bool"
-infer (NBin "<" _ _) = "Bool"
-infer (NBin "<=" _ _) = "Bool"
-infer (NBin "&&" _ _) = "Bool"
-infer (NBin "||" _ _) = "Bool"
-infer NBin {} = undefined
-infer (NUni "!" _) = "Double"
-infer (NUni "-" _) = "Double"
-infer (NUni _ _) = undefined
+infer :: [(String, SX)] -> NValue -> String
+infer _ (NDouble _) = "Double"
+infer _ (NBool _) = "Bool"
+infer args (NVar name) = do
+  let sx = fromJust $ lookup name args
+  case sx of
+    (SXDouble _) -> "Double"
+    (SXBool _) -> "Bool"
+infer _ NIte {} = "Double"
+infer _ (NBin "+" _ _) = "Double"
+infer _ (NBin "-" _ _) = "Double"
+infer _ (NBin "*" _ _) = "Double"
+infer _ (NBin "/" _ _) = "Double"
+infer _ (NBin ">=" _ _) = "Bool"
+infer _ (NBin ">" _ _) = "Bool"
+infer _ (NBin "<" _ _) = "Bool"
+infer _ (NBin "<=" _ _) = "Bool"
+infer _ (NBin "&&" _ _) = "Bool"
+infer _ (NBin "||" _ _) = "Bool"
+infer _ NBin {} = undefined
+infer _ (NUni "!" _) = "Double"
+infer _ (NUni "-" _) = "Double"
+infer _ (NUni _ _) = undefined
 
 data SX
   = SXBool SBool
@@ -112,9 +116,18 @@ _toSX args (NBin ">" a b) = do
   (SXDouble b') <- _toSX args b
   pure $ SXBool $ a' .> b'
 _toSX args (NBin "==" a b) = do
-  (SXDouble a') <- _toSX args a
-  (SXDouble b') <- _toSX args b
-  pure $ SXBool $ a' .== b'
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> do
+      (SXDouble a') <- _toSX args a
+      (SXDouble b') <- _toSX args b
+      pure $ SXBool $ a' .== b'
+    ["Bool", "Bool"] -> do
+      (SXBool a') <- _toSX args a
+      (SXBool b') <- _toSX args b
+      pure $ SXBool $ a' .== b'
+    _ -> undefined
 _toSX args (NBin "/=" a b) = do
   (SXDouble a') <- _toSX args a
   (SXDouble b') <- _toSX args b

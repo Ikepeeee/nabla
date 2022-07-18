@@ -24,10 +24,10 @@ spec = do
       $ infer fixtureTypeEnv (Fun "a" (Fun "b" (app2 (Var "+") (Var "a") (Var "b")))) `shouldBe` Right (TFun TNum (TFun TNum TNum))
     it "(\\a -> a) 1 is Num"
       $ infer fixtureTypeEnv (App (Fun "a" (Var "a")) (Num 1)) `shouldBe` Right TNum
-    -- it "(\\a -> a) (\\b -> b) is T2 -> T2"
-    --   $ infer fixtureTypeEnv (App (Fun "a" (Var "a")) (Fun "b" (Var "b"))) `shouldBe` Right (TFun (TVar 2) (TVar 2))
-    -- it "(\\a -> a) (\\a -> a + 1) is Num -> Num"
-    --   $ infer fixtureTypeEnv (App (Fun "a" (Var "a")) (Fun "a" (app2 (Var "+") (Var "a") (Num 1)))) `shouldBe` Right (TFun TNum TNum)
+    it "(\\a -> a) (\\a -> a) is T2 -> T2"
+      $ infer fixtureTypeEnv (App (Fun "a" (Var "a")) (Fun "b" (Var "b"))) `shouldBe` Right (TFun (TVar 2) (TVar 2))
+    it "(\\a -> a) (\\a -> a + 1) is Num -> Num"
+      $ infer fixtureTypeEnv (App (Fun "a" (Var "a")) (Fun "a" (app2 (Var "+") (Var "a") (Num 1)))) `shouldBe` Right (TFun TNum TNum)
   describe "valid function" $ do
     it "'0 : { n : Num | n >= 0 }' is OK"
       $ valid fixtureTypeEnv (TypedExpr zero (Just posSieve))

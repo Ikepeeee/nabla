@@ -4,14 +4,17 @@ module Language.Nabla.Regex where
 
 import Text.Megaparsec (Parsec, parse, some, try, (<|>), sepBy)
 import Text.Megaparsec.Char
+import Text.Megaparsec.Error
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Void ( Void )
+import Data.Functor
 import Data.SBV
 import Data.SBV.RegExp
 
 type Parser = Parsec Void String
 
-regex exp = parse regExp "" exp
+regex :: String -> Either (ParseErrorBundle String Void) RegExp
+regex = parse regExp ""
 
 example :: String -> IO SatResult
 example exp = case regex exp of
@@ -19,13 +22,11 @@ example exp = case regex exp of
   --Left e ->
 
 regExp :: Parser RegExp
-regExp = Conc <$> (some
-  $ try star
+regExp = Conc <$> some (try star
   <|> try plus
   <|> try opt
   <|> try loop
-  <|> atom
-  )
+  <|> atom)
 
 star :: Parser RegExp
 star = KStar <$> atom <* char '*'
@@ -36,7 +37,7 @@ plus = KPlus <$> atom <* char '+'
 group :: Parser RegExp
 group = Union <$> (char '(' *> sepBy regExp sep <* char ')')
   where
-    sep = char '|' *> pure ()
+    sep = char '|' $> ()
 
 loop :: Parser RegExp
 loop = do
@@ -55,7 +56,7 @@ atom :: Parser RegExp
 atom = w <|> c <|> group
 
 c :: Parser RegExp
-c = exactly <$> (:[]) <$>
+c = exactly . (: []) <$>
   (spaceChar
   <|> upperChar
   <|> lowerChar
@@ -67,35 +68,35 @@ c = exactly <$> (:[]) <$>
   <|> char '%'
   <|> char '&'
   <|> char '\''
-  <|> string "\\(" *> pure '('
-  <|> string "\\)" *> pure ')'
-  <|> string "\\*" *> pure '*'
-  <|> string "\\+" *> pure '+'
+  <|> string "\\(" $> '('
+  <|> string "\\)" $> ')'
+  <|> string "\\*" $> '*'
+  <|> string "\\+" $> '+'
   <|> char ','
   <|> char '-'
-  <|> string "\\." *> pure '.'
+  <|> string "\\." $> '.'
   <|> char '/'
   <|> char ':'
   <|> char ';'
   <|> char '<'
   <|> char '='
   <|> char '>'
-  <|> string "\\?" *> pure '?'
+  <|> string "\\?" $> '?'
   <|> char '@'
-  <|> string "\\[" *> pure '['
-  <|> string "\\\\" *> pure '\\'
-  <|> string "\\]" *> pure ']'
-  <|> string "\\^" *> pure '^'
+  <|> string "\\[" $> '['
+  <|> string "\\\\" $> '\\'
+  <|> string "\\]" $> ']'
+  <|> string "\\^" $> '^'
   <|> char '_'
   <|> char '`'
-  <|> string "\\{" *> pure '{'
-  <|> string "\\|" *> pure '|'
-  <|> string "\\}" *> pure '}'
+  <|> string "\\{" $> '{'
+  <|> string "\\|" $> '|'
+  <|> string "\\}" $> '}'
   <|> char '~'
   )
 
 w :: Parser RegExp
-w = string "\\w" *> pure (asciiLetter + digit)
- <|> string "\\d" *> pure digit
- <|> char '.' *> pure (Range '!' '~')
+w = string "\\w" $> (asciiLetter + digit)
+ <|> string "\\d" $> digit
+ <|> char '.' $> Range '!' '~'
  <|> char '[' *> (Union <$> some atom) <* char ']'

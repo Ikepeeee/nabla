@@ -8,7 +8,7 @@ import Data.SBV.Dynamic
 import Control.Monad.State.Lazy
 import Control.Monad.Except
 import Control.Monad.Identity
-import Data.Map (empty, fromList, insert, lookup, Map, member, (!), filter, toList, findWithDefault, elems)
+import Data.Map (empty, fromList, insert, delete, lookup, Map, member, (!), filter, toList, findWithDefault, elems)
 import Language.Nabla.AST
 import Debug.Trace
 
@@ -33,9 +33,13 @@ instance Show TypeError where
   show (UnapplicableTypeError tf t) = "can't apply: (" <> show tf <> ") " <> show t
   show (NotFoundTypeVarError id) = "T" <> show id <> " is not found"
   show (NotFoundVarError name) = "not found: " ++ name
+  show (CannotUnify t1 t2) = ""
 
 evalInfer :: TypeEnv -> Infer a -> Either TypeError a
 evalInfer env (Infer f) = runExcept $ evalStateT f env
+
+runInfer :: TypeEnv -> Infer a -> Either TypeError (a, TypeEnv)
+runInfer env (Infer f) = runExcept $ runStateT f env
 
 valid :: TypeEnv -> TypedExpr -> Either TypeError Type
 valid env e = evalInfer env (valid' e)
@@ -71,14 +75,16 @@ infer' (Var x) = do
   case lookup x env of
     Just t  -> pure t
     Nothing -> throwError $ NotFoundVarError x
-infer' (Fun parm e) = do
+infer' (Fun param e) = do
   env <- get
   var <- createTVar
-  let argType = findWithDefault var parm env
-  modify $ insert parm argType
-  retType <- infer' e
-  env <- get
-  pure $ TFun (env ! parm) retType
+  -- let paramType = findWithDefault var param env
+  (retType, env') <- case runInfer (insert param var env) (infer' e) of
+    Right t -> pure t
+    Left e -> throwError e
+  -- modify $ delete parm -- delete local scope param
+  modify $ insert param (env' ! param)
+  pure $ TFun (env' ! param) retType
 infer' (App f arg) = do
   ft <- infer' f
   at <- infer' arg
@@ -184,7 +190,7 @@ fixtureSBVExpr = fromList
   , ("[unary]!", sbvUnary svNot)
   ]
 
-a = proveWithAny [z3] $ do
+a = proveWith z3 $ do
   let sbvExpr = toSBVExpr empty $ App (Fun "a" (App (App (Var ">=") (Var "a")) (Var "a"))) (Num 1)
   pure $ toSVal sbvExpr
 
