@@ -24,22 +24,25 @@ pFun = do
   lexeme $ string "->"
   expr <- pExpr
   lexeme $ string ":"
-  NFunc args expr <$> pSieve
+  (argName, cond) <- pSieve
+  pure $ NFunc args expr argName cond
 
 pArg :: Parser NArg
 pArg = do
   arg <- tIdent
   lexeme $ string ":"
-  NArg arg <$> pSieve
+  (_, cond) <- pSieve
+  pure $ NArg arg cond
 
-pSieve :: Parser NValue
+
+pSieve :: Parser (String, NValue)
 pSieve = do
   lexeme $ char '{'
   argName <- tIdent
   lexeme $ char '|'
   expr <- pExpr
   lexeme $ char '}'
-  pure expr
+  pure (argName, expr)
 
 pExpr :: Parser NValue
 pExpr = makeExprParser pTerm operatorTable

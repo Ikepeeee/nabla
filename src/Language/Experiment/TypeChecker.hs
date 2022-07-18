@@ -6,11 +6,11 @@ import Data.SBV.RegExp
 import Data.Maybe
 
 createCond :: NFunc -> Symbolic SBool
-createCond (NFunc args body cond) = do
+createCond (NFunc args body condArg cond) = do
   sArgs <- mapM createSArg args
   let sArgs' = map fst sArgs
   (SXDouble sBody) <- _toSX sArgs' body
-  (SXBool sCond) <- _toSX [("x", sBody)] cond
+  (SXBool sCond) <- _toSX [(condArg, sBody)] cond
   let sArgConds = map snd sArgs
   pure $ foldr (.&&) sTrue sArgConds .=> sCond
 

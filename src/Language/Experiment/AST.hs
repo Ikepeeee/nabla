@@ -1,6 +1,6 @@
 module Language.Experiment.AST where
 
-data NFunc = NFunc [NArg] NValue NValue
+data NFunc = NFunc [NArg] NValue String NValue
 
 data NArg = NArg String NValue
 
