@@ -1,13 +1,15 @@
 module Language.Experiment.AST where
 
-data NFunc = NFunc [NArg] NValue String NValue
+type TypeName = String
 
-data NArg = NArg String NValue
+data NFunc = NFunc [NArg] NValue String TypeName NValue
+
+data NArg = NArg String TypeName NValue
 
 data NValue
   = NDouble Double
   | NBool Bool
-  | NDoubleVar String
+  | NVar String
   | NIte NValue NValue NValue
   | NBin String NValue NValue
   | NUni String NValue
