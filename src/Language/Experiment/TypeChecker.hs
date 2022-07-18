@@ -16,16 +16,15 @@ createCond (NFunc args body condArg _ cond) = do
 
 createSArg :: NArg -> Symbolic ((String, SX), SBool)
 createSArg (NArg name typeName cond) = do
-  case typeName of
-    "Double" -> do
-      v <- sDouble name
-      (SXBool c) <- _toSX [(name, SXDouble v)] cond
-      pure ((name, SXDouble v), c)
-    "Bool" -> do
-      v <- sBool name
-      (SXBool c) <- _toSX [(name, SXBool v)] cond
-      pure ((name, SXBool v), c)
-    _ -> undefined
+  v <- (fromJust $ lookup typeName sxVarCreators) name
+  (SXBool c) <- _toSX [(name, v)] cond
+  pure ((name, v), c)
+
+sxVarCreators :: [([Char], String -> Symbolic SX)]
+sxVarCreators =
+  [ ("Double", fmap SXDouble . sDouble)
+  , ("Bool", fmap SXBool . sBool)
+  ]
 
 infer :: [(String, SX)] -> NValue -> String
 infer _ (NDouble _) = "Double"
