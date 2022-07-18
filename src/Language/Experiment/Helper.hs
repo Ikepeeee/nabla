@@ -17,9 +17,9 @@ runFun :: String -> IO ThmResult
 runFun src = do
   proveWith z3 $ execFun src -- cvc4 or mathsat or z3
 
-trans :: String -> IO ()
-trans src = do
-  let ret = runParser pFun "test" src
-  case ret of
-    Right b -> putStrLn $ transFunc b
-    Left e -> error $ errorBundlePretty e
+-- trans :: String -> IO ()
+-- trans src = do
+--   let ret = runParser pFun "test" src
+--   case ret of
+--     Right b -> putStrLn $ transFunc b
+--     Left e -> error $ errorBundlePretty e

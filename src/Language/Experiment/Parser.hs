@@ -25,20 +25,13 @@ pFun = do
   lexeme $ string ":"
   NFunc args expr <$> pSieve
 
-fsts :: [(a, b)] -> [a]
-fsts vs = map fst vs
-
-snds :: [(a, b)] -> [b]
-snds vs = map snd vs
-
 pArg :: Parser NArg
 pArg = do
   arg <- tIdent
   lexeme $ string ":"
-  premise <- pSieve
-  pure $ NArg arg premise
+  NArg arg <$> pSieve
 
-pSieve :: Parser NBool
+pSieve :: Parser NValue
 pSieve = do
   lexeme $ char '{'
   argName <- tIdent
@@ -47,7 +40,7 @@ pSieve = do
   lexeme $ char '}'
   pure expr
 
-pLogicExpr :: Parser NBool
+pLogicExpr :: Parser NValue
 pLogicExpr =
   try
     ( do
@@ -57,41 +50,40 @@ pLogicExpr =
     )
     <|> pCompExpr
 
-logicOp :: Parser (NBool -> NBool -> NBool)
-logicOp = lexeme $ choice [NAnd <$ string "&&", NOr <$ string "||"]
+logicOp :: Parser (NValue -> NValue -> NValue)
+logicOp = lexeme $ choice [NBin <$> string "&&", NBin <$> string "||"]
 
-pCompExpr :: Parser NBool
+pCompExpr :: Parser NValue
 pCompExpr = do
   a <- pTerm
   op <- compOp
   op a <$> pTerm
 
-compOp :: Parser (NDouble -> NDouble -> NBool)
+compOp :: Parser (NValue -> NValue -> NValue)
 compOp =
   lexeme $
     choice
-      [ NGe <$ string ">=",
-        NLe <$ string "<=",
-        NEq <$ string "==",
-        NNeq <$ string "!=",
-        NGt <$ string ">",
-        NLt <$ string "<"
+      [ NBin <$> string ">=",
+        NBin <$> string "<=",
+        NBin <$> string "==",
+        NBin <$> string "!=",
+        NBin <$> string ">",
+        NBin <$> string "<"
       ]
 
-pCondExpr :: Parser NDouble
+pCondExpr :: Parser NValue
 pCondExpr =
   try
-    ( do
+    (do
         c <- pLogicExpr
         lexeme $ char '?'
         t <- pExpr
         lexeme $ char ':'
-        f <- pExpr
-        pure $ NIte c t f
+        NIte c t <$> pExpr
     )
     <|> pExpr
 
-pExpr :: Parser NDouble
+pExpr :: Parser NValue
 pExpr =
   try
     ( do
@@ -101,7 +93,7 @@ pExpr =
     )
     <|> pTerm
 
-pTerm :: Parser NDouble
+pTerm :: Parser NValue
 pTerm =
   try
     (do
@@ -111,30 +103,24 @@ pTerm =
     )
     <|> pNum
 
-pNum :: Parser NDouble
+pNum :: Parser NValue
 pNum =
   pNum'
     <|> do NDoubleVar <$> tIdent
   where
-    pNum' :: Parser NDouble
+    pNum' :: Parser NValue
     pNum' = NDouble <$> L.signed sc (lexeme $ toRealFloat <$> L.scientific)
 
-exprOp :: Parser (NDouble -> NDouble -> NDouble)
-exprOp = lexeme $ choice [NAdd <$ char '+', NSub <$ char '-']
+exprOp :: Parser (NValue -> NValue -> NValue)
+exprOp = lexeme $ choice [NBin <$> string "+", NBin <$> string "-"]
 
-termOp :: Parser (NDouble -> NDouble -> NDouble)
+termOp :: Parser (NValue -> NValue -> NValue)
 termOp =
   lexeme $
     choice
-      [ NMul <$ char '*',
-        NDiv <$ char '/'
+      [ NBin <$> string "*",
+        NBin <$> string "/"
       ]
-
--- toInt :: NDouble -> SInteger
--- toInt = fromNDouble sRoundTowardZero . fpRoundToIntegral sRoundTowardZero
-
--- toDouble :: SInteger -> NDouble
--- toDouble = toNDouble sRoundTowardZero
 
 tIdent :: Parser String
 tIdent = lexeme ((:) <$> lowerChar <*> many alphaNumChar <?> "variable")

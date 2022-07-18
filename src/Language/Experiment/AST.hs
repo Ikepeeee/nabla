@@ -1,27 +1,13 @@
 module Language.Experiment.AST where
 
-data NFunc = NFunc [NArg] NDouble NBool
+data NFunc = NFunc [NArg] NValue NValue
 
-data NArg = NArg String NBool
+data NArg = NArg String NValue
 
-data NDouble
+data NValue
   = NDouble Double
+  | NBool Bool
   | NDoubleVar String
-  | NMinus NDouble
-  | NAdd NDouble NDouble
-  | NSub NDouble NDouble
-  | NMul NDouble NDouble
-  | NDiv NDouble NDouble
-  | NIte NBool NDouble NDouble
-
-data NBool
-  = NBool Bool
-  | NAnd NBool NBool
-  | NOr NBool NBool
-  | NNot NBool
-  | NLe NDouble NDouble
-  | NLt NDouble NDouble
-  | NGe NDouble NDouble
-  | NGt NDouble NDouble
-  | NEq NDouble NDouble
-  | NNeq NDouble NDouble
+  | NIte NValue NValue NValue
+  | NBin String NValue NValue
+  | NUni String NValue
