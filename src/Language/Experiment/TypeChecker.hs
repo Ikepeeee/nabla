@@ -5,6 +5,9 @@ import Data.SBV
 import Data.SBV.String as S
 import Data.SBV.RegExp
 import Data.Maybe
+import Data.Either (fromRight)
+import Text.Megaparsec (parse)
+import Language.Experiment.Regex (regex)
 
 createCond :: NFunc -> Symbolic SBool
 createCond (NFunc args body condArg _ cond) = do
@@ -72,7 +75,7 @@ _toSX :: [(String, SX)] -> NValue -> Symbolic SX
 _toSX _ (NDouble v) = pure $ SXDouble $ literal v
 _toSX _ (NBool v) = pure $ SXBool $ literal v
 _toSX _ (NString v) = pure $ SXString $ literal v
-_toSX _ (NRegex v) = pure $ SXRegex $ exactly v * KStar All
+_toSX _ (NRegex v) = pure $ SXRegex $ fromRight undefined (regex v)
 _toSX args (NVar name) = pure $ fromJust $ lookup name args
 _toSX args (NIte c a b) = do
   (SXBool c') <- _toSX args c
