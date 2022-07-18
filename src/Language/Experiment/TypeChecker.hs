@@ -87,4 +87,7 @@ _toSX _ NBin {} = undefined
 _toSX args (NUni "!" v) = do
   (SXBool v') <- _toSX args v
   pure $ SXBool $ sNot v'
+_toSX args (NUni "-" v) = do
+  (SXDouble v') <- _toSX args v
+  pure $ SXDouble $ - v'
 _toSX _ (NUni _ _) = undefined
