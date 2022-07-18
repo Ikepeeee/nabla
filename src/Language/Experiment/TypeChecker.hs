@@ -2,6 +2,7 @@ module Language.Experiment.TypeChecker where
 
 import Language.Experiment.AST
 import Data.SBV
+import Data.SBV.String as S
 import Data.SBV.RegExp
 import Data.Maybe
 
@@ -40,7 +41,13 @@ infer args (NVar name) = do
     (SXString _) -> "String"
     (SXRegex _) -> "Regex"
 infer _ NIte {} = "Double"
-infer _ (NBin "+" _ _) = "Double"
+infer args (NBin "+" a b) = do
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> "Double"
+    ["String", "String"] -> "String"
+    _ -> undefined
 infer _ (NBin "-" _ _) = "Double"
 infer _ (NBin "*" _ _) = "Double"
 infer _ (NBin "/" _ _) = "Double"
@@ -73,9 +80,18 @@ _toSX args (NIte c a b) = do
   (SXDouble b') <- _toSX args b
   pure $ SXDouble $ ite c' a' b'
 _toSX args (NBin "+" a b) = do
-  (SXDouble a') <- _toSX args a
-  (SXDouble b') <- _toSX args b
-  pure $ SXDouble $ a' + b'
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> do
+      (SXDouble a') <- _toSX args a
+      (SXDouble b') <- _toSX args b
+      pure $ SXDouble $ a' + b'
+    ["String", "String"] -> do
+      (SXString a') <- _toSX args a
+      (SXString b') <- _toSX args b
+      pure $ SXString $ a' S.++ b'
+    _ -> error $ aType <> bType
 _toSX args (NBin "-" a b) = do
   (SXDouble a') <- _toSX args a
   (SXDouble b') <- _toSX args b
