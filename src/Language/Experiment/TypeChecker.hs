@@ -129,9 +129,18 @@ _toSX args (NBin "==" a b) = do
       pure $ SXBool $ a' .== b'
     _ -> undefined
 _toSX args (NBin "/=" a b) = do
-  (SXDouble a') <- _toSX args a
-  (SXDouble b') <- _toSX args b
-  pure $ SXBool $ a' ./= b'
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> do
+      (SXDouble a') <- _toSX args a
+      (SXDouble b') <- _toSX args b
+      pure $ SXBool $ a' ./= b'
+    ["Bool", "Bool"] -> do
+      (SXBool a') <- _toSX args a
+      (SXBool b') <- _toSX args b
+      pure $ SXBool $ a' ./= b'
+    _ -> undefined
 _toSX _ NBin {} = undefined
 _toSX args (NUni "!" v) = do
   (SXBool v') <- _toSX args v

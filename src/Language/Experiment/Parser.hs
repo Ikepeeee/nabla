@@ -65,7 +65,7 @@ operatorTable =
     , binary "<=" (NBin "<=")
     , binary "<" (NBin "<")
     , binary "==" (NBin "==")
-    , binary "/=" (NBin "/=")
+    , binary "!=" (NBin "/=")
     ]
   , [ prefix "!" (NUni "!")
     ]
