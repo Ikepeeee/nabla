@@ -40,7 +40,7 @@ pSieve = do
   lexeme $ char '{'
   argName <- tIdent
   lexeme $ char ':'
-  t <- lexeme $ string "Double" <|> string "Bool"
+  t <- lexeme $ string "Double" <|> string "Bool" <|> string "String"
   lexeme $ char '|'
   expr <- pExpr
   lexeme $ char '}'
@@ -66,6 +66,7 @@ operatorTable =
     , binary "<" (NBin "<")
     , binary "==" (NBin "==")
     , binary "!=" (NBin "/=")
+    , binary "~=" (NBin "~=")
     ]
   , [ prefix "!" (NUni "!")
     ]
@@ -83,6 +84,8 @@ pTerm = choice
   , pIdent
   , pNum
   , pBool
+  , pString
+  , pRegex
   ]
 
 binary :: String -> (NValue -> NValue -> NValue) -> Operator Parser NValue
@@ -97,6 +100,12 @@ pBool = lexeme $ choice
   [ NBool True <$ string "True"
   , NBool False <$ string "False"
   ]
+
+pRegex :: Parser NValue
+pRegex = NRegex <$> lexeme (char '/' *> manyTill L.charLiteral (char '/'))
+
+pString :: Parser NValue
+pString = NString <$> lexeme (char '\'' *> manyTill L.charLiteral (char '\''))
 
 pNum :: Parser NValue
 pNum = NDouble <$> L.signed sc (lexeme $ toRealFloat <$> L.scientific)
