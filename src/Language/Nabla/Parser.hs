@@ -3,7 +3,6 @@
 module Language.Nabla.Parser where
 
 import Control.Monad.Trans (MonadTrans (lift))
-import Data.Maybe (fromJust)
 import Data.Scientific (toRealFloat)
 import Data.Void
 import System.IO.Unsafe (unsafePerformIO)
@@ -16,7 +15,10 @@ import Language.Nabla.AST
 
 type Parser = Parsec Void String
 
-pFun :: Parser NFunc
+pFuns :: Parser [(String, NFunc)]
+pFuns = many pFun
+
+pFun :: Parser (String, NFunc)
 pFun = do
   name <- tIdent
   lexeme $ char '('
@@ -26,7 +28,7 @@ pFun = do
   expr <- pExpr
   lexeme $ string ":"
   (argName, t, cond) <- pSieve
-  pure $ NFunc args expr argName t cond
+  pure (name, NFunc args expr argName t cond)
 
 pArg :: Parser NArg
 pArg = do
@@ -87,6 +89,7 @@ pTerm = choice
   , pBool
   , pString
   , pRegex
+  , pApp
   ] <?> "term"
 
 binary :: String -> (NValue -> NValue -> NValue) -> Operator Parser NValue
@@ -101,6 +104,15 @@ pBool = lexeme (choice
   [ NBool True <$ string "True"
   , NBool False <$ string "False"
   ] <?> "bool")
+
+pApp :: Parser NValue
+pApp = do
+  char '#'
+  name <- tIdent
+  lexeme $ char '('
+  args <- pExpr `sepBy` lexeme (char ',')
+  lexeme $ char ')'
+  pure $ NApp name args
 
 pRegex :: Parser NValue
 pRegex = NRegex <$> lexeme (char '/' *> manyTill L.charLiteral (char '/')) <?> "regex"
