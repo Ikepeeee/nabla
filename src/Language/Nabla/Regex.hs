@@ -16,11 +16,6 @@ type Parser = Parsec Void String
 regex :: String -> Either (ParseErrorBundle String Void) RegExp
 regex = parse regExp ""
 
-example :: String -> IO SatResult
-example exp = case regex exp of
-  Right r -> sat $ \s ->  (s :: SString) `match` r
-  --Left e ->
-
 regExp :: Parser RegExp
 regExp = Conc <$> some (try star
   <|> try plus

@@ -1,35 +1,17 @@
 module Language.Nabla.AST where
 
-import Data.List (intercalate)
+type TypeName = String
 
-data TypedExpr
-  = TypedExpr Expr (Maybe Sieve)
-  deriving (Eq, Show)
+data NFunc = NFunc [NArg] NValue String TypeName NValue
 
-data Type
-  = TFun Type Type
-  | TNum
-  | TBool
-  | TVar Int
-  deriving (Eq)
+data NArg = NArg String TypeName NValue
 
--- base type
--- condition
--- ex) { n : TNum | n > 0 }
-data Sieve = Sieve Type Expr deriving (Show, Eq)
-
-instance Show Type where
-  show TNum = "Num"
-  show TBool = "Bool"
-  show (TFun p e) = pp p ++ " -> " ++ show e
-    where pp fun@(TFun _ _) = "(" ++ show fun ++ ")"
-          pp t = show t
-  show (TVar id) = "T" <> show id
-
-data Expr
-  = Num Double
-  | Bool Bool
-  | Var String
-  | Fun String Expr
-  | App Expr Expr
-  deriving (Eq, Show)
+data NValue
+  = NDouble Double
+  | NBool Bool
+  | NString String
+  | NRegex String
+  | NVar String
+  | NIte NValue NValue NValue
+  | NBin String NValue NValue
+  | NUni String NValue

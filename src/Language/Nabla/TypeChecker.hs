@@ -1,198 +1,180 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.Nabla.TypeChecker where
-import Prelude hiding (lookup, filter)
-import System.IO.Unsafe
-import Data.SBV (symbolic)
-import Data.SBV.Dynamic
-import Control.Monad.State.Lazy
-import Control.Monad.Except
-import Control.Monad.Identity
-import Data.Map (empty, fromList, insert, delete, lookup, Map, member, (!), filter, toList, findWithDefault, elems)
+
 import Language.Nabla.AST
-import Debug.Trace
+import Data.SBV
+import Data.SBV.String as S
+import Data.SBV.RegExp
+import Data.Maybe
+import Data.Either (fromRight)
+import Text.Megaparsec (parse)
+import Language.Nabla.Regex (regex)
 
--- Type Environment
-type TypeEnv = Map String Type
+createCond :: NFunc -> Symbolic SBool
+createCond (NFunc args body condArg _ cond) = do
+  sArgs <- mapM createSArg args
+  let sArgs' = map fst sArgs
+  sBody <- _toSX sArgs' body
+  (SXBool sCond) <- _toSX [(condArg, sBody)] cond
+  let sArgConds = map snd sArgs
+  pure $ foldr (.&&) sTrue sArgConds .=> sCond
 
-data TypeError
-  = UnmatchableTypeError Expr Type
-  | UnmatchableSieveError Expr Sieve
-  | UnapplicableTypeError Type Type
-  | NotFoundVarError String
-  | NotFoundTypeVarError Int
-  | CannotUnify Type Type
-  deriving (Eq)
+createSArg :: NArg -> Symbolic ((String, SX), SBool)
+createSArg (NArg name typeName cond) = do
+  v <- (fromJust $ lookup typeName sxVarCreators) name
+  (SXBool c) <- _toSX [(name, v)] cond
+  pure ((name, v), c)
 
-newtype Infer a = Infer (StateT TypeEnv (Except TypeError) a)
-　deriving (Functor, Applicative, Monad, MonadState TypeEnv, MonadError TypeError)
-
-instance Show TypeError where
-  show (UnmatchableTypeError e t) = show e <> " is not " <> show t
-  show (UnmatchableSieveError e s) = show e <> " is not " <> show s
-  show (UnapplicableTypeError tf t) = "can't apply: (" <> show tf <> ") " <> show t
-  show (NotFoundTypeVarError id) = "T" <> show id <> " is not found"
-  show (NotFoundVarError name) = "not found: " ++ name
-  show (CannotUnify t1 t2) = ""
-
-evalInfer :: TypeEnv -> Infer a -> Either TypeError a
-evalInfer env (Infer f) = runExcept $ evalStateT f env
-
-runInfer :: TypeEnv -> Infer a -> Either TypeError (a, TypeEnv)
-runInfer env (Infer f) = runExcept $ runStateT f env
-
-valid :: TypeEnv -> TypedExpr -> Either TypeError Type
-valid env e = evalInfer env (valid' e)
-
-valid' :: TypedExpr -> Infer Type
-valid' (TypedExpr e Nothing) = infer' e
-valid' (TypedExpr e (Just sieve@(Sieve t sf@(Fun arg e')))) = do
-  modify $ insert arg t
-  sieveType <- infer' sf -- sieve is t -> Bool
-  if sieveType /= TFun t TBool
-    then throwError $ UnmatchableTypeError sf (TFun t TBool)
-    else pure ()
-  t' <- infer' e
-  if t == t'
-    then pure t
-    else throwError $ UnmatchableTypeError e t
-  let (SBVFun f) = toSBVExpr empty sf
-  let x = toSBVExpr empty e
-  let (SBVVal r) = f x
-  let (_, _, ThmResult result) = unsafePerformIO $ proveWithAny [z3] (pure r)
-  case result of
-    (Unsatisfiable _ _) -> pure t -- Q.E.D.
-    _ -> throwError $ UnmatchableSieveError e sieve
-
-infer :: TypeEnv -> Expr -> Either TypeError Type
-infer env e = evalInfer env (infer' e)
-
-infer' :: Expr -> Infer Type
-infer' (Num _) = pure TNum
-infer' (Bool _) = pure TBool
-infer' (Var x) = do
-  env <- get
-  case lookup x env of
-    Just t  -> pure t
-    Nothing -> throwError $ NotFoundVarError x
-infer' (Fun param e) = do
-  env <- get
-  var <- createTVar
-  -- let paramType = findWithDefault var param env
-  (retType, env') <- case runInfer (insert param var env) (infer' e) of
-    Right t -> pure t
-    Left e -> throwError e
-  -- modify $ delete parm -- delete local scope param
-  modify $ insert param (env' ! param)
-  pure $ TFun (env' ! param) retType
-infer' (App f arg) = do
-  ft <- infer' f
-  at <- infer' arg
-  rt <- typeApp ft at
-  unify ft (TFun at rt)
-  pure rt
-
-unify :: Type -> Type -> Infer ()
-unify (TFun p1 e1) (TFun p2 e2) = do
-  unify p1 p2
-unify t1@(TVar i1) t2@(TVar i2)
-  | i1 == i2  = return ()
-unify (TVar i1) t2 = unifyVar i1 t2
-unify t1 (TVar i2) = unifyVar i2 t1
-unify t1 t2
-  | t1 == t2  = return ()
-  | otherwise = throwError $ CannotUnify t1 t2
-
-unifyVar :: Int -> Type -> Infer ()
-unifyVar id t = do
-  env <- get
-  let types = toList $ filter (byID id) env
-  case types of
-    [(name, _)] -> do
-      map <- get
-      modify $ insert name t
-    _ -> throwError $ NotFoundTypeVarError id
-
-isTVar :: Type -> Bool
-isTVar (TVar _) = True
-isTVar _ = False
-
-byID :: Int -> Type -> Bool
-byID id (TVar id') = id == id'
-byID _ _ = False
-
-typeApp :: Type -> Type -> Infer Type
-typeApp (TFun paramType retType) argType
-  | paramType == argType = pure retType
-  | isTVar argType = pure retType
-  | isTVar paramType = pure $ appInstance paramType argType retType
-  | otherwise = throwError $ UnapplicableTypeError paramType argType
-typeApp paramType argType = throwError $ UnapplicableTypeError paramType argType
-
--- Replace a type variable to instance type
--- appInstance T1 Num (T1 -> T2) == Num -> T2
-appInstance :: Type -> Type -> Type -> Type
-appInstance tgtType insType (TFun paramType retType)
-  = TFun (appInstance tgtType insType paramType) (appInstance tgtType insType retType)
-appInstance tgtType insType retType
-  | retType == tgtType = insType
-  | otherwise = retType
-data SBVExpr
-  = SBVVal SVal
-  | SBVFun (SBVExpr -> SBVExpr)
-
-instance Show SBVExpr where
-  show (SBVVal _) = "SBVVal"
-  show (SBVFun _) = "SBVFun"
-
-sbvUnary :: (SVal -> SVal) -> SBVExpr
-sbvUnary unary = SBVFun $ \(SBVVal a) -> SBVVal $ unary a
-
-sbvBin :: (SVal -> SVal -> SVal) -> SBVExpr
-sbvBin bin = SBVFun $ \(SBVVal a) -> SBVFun $ \(SBVVal b) -> SBVVal $ bin a b
-
-toSBVExpr :: Map String SBVExpr -> Expr -> SBVExpr
-toSBVExpr _ (Num e) = SBVVal $ svDouble e
-toSBVExpr _ (Bool e) = SBVVal $ svBool e
-toSBVExpr svals (Fun argName e) = SBVFun $ \a -> toSBVExpr (insert argName a svals) e
-toSBVExpr svals (App f' x') = do
-  let (SBVFun f) = toSBVExpr svals f'
-  let x = toSBVExpr svals x'
-  f x
-toSBVExpr svals (Var name)
-  | member name fixtureSBVExpr = fixtureSBVExpr ! name
-  | otherwise = svals ! name
-
-toSVal :: SBVExpr -> SVal
-toSVal (SBVVal a) = a
-
-createTVar :: Infer Type
-createTVar = do
-  env <- get
-  let ns = map (\(TVar n) -> n) $ elems $ filter isTVar env
-  pure $ TVar $ maximum (0:ns) + 1
-
-fixtureSBVExpr :: Map String SBVExpr
-fixtureSBVExpr = fromList
-  [ ("+", sbvBin svPlus)
-  , ("-", sbvBin svMinus)
-  , ("*", sbvBin svTimes)
-  , ("/", sbvBin svDivide)
-  , (">", sbvBin svGreaterThan)
-  , (">=", sbvBin svGreaterEq)
-  , ("<", sbvBin svLessThan)
-  , ("<=", sbvBin svLessEq)
-  , ("==", sbvBin svEqual)
-  , ("&&", sbvBin svAnd)
-  , ("||", sbvBin svOr)
-  , ("[unary]-", sbvUnary svUNeg)
-  , ("[unary]+", sbvUnary svAbs)
-  , ("[unary]!", sbvUnary svNot)
+sxVarCreators :: [([Char], String -> Symbolic SX)]
+sxVarCreators =
+  [ ("Double", fmap SXDouble . sDouble)
+  , ("Bool", fmap SXBool . sBool)
+  , ("String", fmap SXString . sString)
   ]
 
-a = proveWith z3 $ do
-  let sbvExpr = toSBVExpr empty $ App (Fun "a" (App (App (Var ">=") (Var "a")) (Var "a"))) (Num 1)
-  pure $ toSVal sbvExpr
+infer :: [(String, SX)] -> NValue -> String
+infer _ (NDouble _) = "Double"
+infer _ (NBool _) = "Bool"
+infer _ (NString _) = "String"
+infer _ (NRegex _) = "Regex"
+infer args (NVar name) = do
+  let sx = fromJust $ lookup name args
+  case sx of
+    (SXDouble _) -> "Double"
+    (SXBool _) -> "Bool"
+    (SXString _) -> "String"
+    (SXRegex _) -> "Regex"
+infer _ NIte {} = "Double"
+infer args (NBin "+" a b) = do
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> "Double"
+    ["String", "String"] -> "String"
+    _ -> undefined
+infer _ (NBin "-" _ _) = "Double"
+infer _ (NBin "*" _ _) = "Double"
+infer _ (NBin "/" _ _) = "Double"
+infer _ (NBin ">=" _ _) = "Bool"
+infer _ (NBin ">" _ _) = "Bool"
+infer _ (NBin "<" _ _) = "Bool"
+infer _ (NBin "<=" _ _) = "Bool"
+infer _ (NBin "&&" _ _) = "Bool"
+infer _ (NBin "||" _ _) = "Bool"
+infer _ NBin {} = undefined
+infer _ (NUni "!" _) = "Double"
+infer _ (NUni "-" _) = "Double"
+infer _ (NUni _ _) = undefined
 
-trace' :: Show a => String -> a -> a
-trace' m a = trace (m <> show a) a
+data SX
+  = SXBool SBool
+  | SXDouble SDouble
+  | SXString SString
+  | SXRegex RegExp
+
+_toSX :: [(String, SX)] -> NValue -> Symbolic SX
+_toSX _ (NDouble v) = pure $ SXDouble $ literal v
+_toSX _ (NBool v) = pure $ SXBool $ literal v
+_toSX _ (NString v) = pure $ SXString $ literal v
+_toSX _ (NRegex v) = pure $ SXRegex $ fromRight undefined (regex v)
+_toSX args (NVar name) = pure $ fromJust $ lookup name args
+_toSX args (NIte c a b) = do
+  (SXBool c') <- _toSX args c
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXDouble $ ite c' a' b'
+_toSX args (NBin "+" a b) = do
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> do
+      (SXDouble a') <- _toSX args a
+      (SXDouble b') <- _toSX args b
+      pure $ SXDouble $ a' + b'
+    ["String", "String"] -> do
+      (SXString a') <- _toSX args a
+      (SXString b') <- _toSX args b
+      pure $ SXString $ a' S.++ b'
+    _ -> error $ aType <> bType
+_toSX args (NBin "-" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXDouble $ a' - b'
+_toSX args (NBin "*" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXDouble $ a' * b'
+_toSX args (NBin "/" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXDouble $ a' / b'
+_toSX args (NBin "&&" a b) = do
+  (SXBool a') <- _toSX args a
+  (SXBool b') <- _toSX args b
+  pure $ SXBool $ a' .&& b'
+_toSX args (NBin "||" a b) = do
+  (SXBool a') <- _toSX args a
+  (SXBool b') <- _toSX args b
+  pure $ SXBool $ a' .|| b'
+_toSX args (NBin "<=" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXBool $ a' .<= b'
+_toSX args (NBin "<" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXBool $ a' .< b'
+_toSX args (NBin ">=" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXBool $ a' .>= b'
+_toSX args (NBin ">" a b) = do
+  (SXDouble a') <- _toSX args a
+  (SXDouble b') <- _toSX args b
+  pure $ SXBool $ a' .> b'
+_toSX args (NBin "==" a b) = do
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> do
+      (SXDouble a') <- _toSX args a
+      (SXDouble b') <- _toSX args b
+      pure $ SXBool $ a' .== b'
+    ["Bool", "Bool"] -> do
+      (SXBool a') <- _toSX args a
+      (SXBool b') <- _toSX args b
+      pure $ SXBool $ a' .== b'
+    ["String", "String"] -> do
+      (SXString a') <- _toSX args a
+      (SXString b') <- _toSX args b
+      pure $ SXBool $ a' .== b'
+    _ -> undefined
+_toSX args (NBin "/=" a b) = do
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["Double", "Double"] -> do
+      (SXDouble a') <- _toSX args a
+      (SXDouble b') <- _toSX args b
+      pure $ SXBool $ a' ./= b'
+    ["Bool", "Bool"] -> do
+      (SXBool a') <- _toSX args a
+      (SXBool b') <- _toSX args b
+      pure $ SXBool $ a' ./= b'
+    _ -> undefined
+_toSX args (NBin "~=" a b) = do
+  let aType = infer args a
+  let bType = infer args b
+  case [aType, bType] of
+    ["String", "Regex"] -> do
+      (SXString a') <- _toSX args a
+      (SXRegex b') <- _toSX args b
+      pure $ SXBool $ a' `match` b'
+    _ -> undefined
+_toSX _ NBin {} = undefined
+_toSX args (NUni "!" v) = do
+  (SXBool v') <- _toSX args v
+  pure $ SXBool $ sNot v'
+_toSX args (NUni "-" v) = do
+  (SXDouble v') <- _toSX args v
+  pure $ SXDouble $ - v'
+_toSX _ (NUni _ _) = undefined

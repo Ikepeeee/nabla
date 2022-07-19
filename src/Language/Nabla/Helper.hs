@@ -1,16 +1,25 @@
 module Language.Nabla.Helper where
 
-import Data.Text (Text, unpack, pack)
-import Text.Megaparsec (parse, errorBundlePretty)
-import Language.Nabla.TypeChecker (valid)
-import Language.Nabla.AST (Type)
-import Language.Nabla.Parser (pTypedExpr)
-import Language.Nabla.Fixture (fixtureTypeEnv)
+import Data.SBV ( proveWith, z3, SBool, Symbolic, ThmResult )
+import Text.Megaparsec ( runParser, errorBundlePretty )
+import Language.Nabla.Parser ( pFun )
+import Language.Nabla.Printer
+import Language.Nabla.TypeChecker ( createCond )
 
-parseAndInfer :: String -> Either String Type
-parseAndInfer src =
-  case parse pTypedExpr "test" (pack src) of
-    Right e -> case valid fixtureTypeEnv e of
-      (Right t) -> pure t
-      (Left e) -> Left $ show e
-    Left e -> Left $ errorBundlePretty e
+execFun :: String -> Symbolic SBool
+execFun src = do
+  let ret = runParser pFun "test" src
+  case ret of
+    Right b -> createCond b
+    Left e -> error $ errorBundlePretty e
+
+runFun :: String -> IO ThmResult
+runFun src = do
+  proveWith z3 $ execFun src -- cvc4 or mathsat or z3
+
+trans :: String -> IO ()
+trans src = do
+  let ret = runParser pFun "test" src
+  case ret of
+    Right b -> putStrLn $ transFunc b
+    Left e -> error $ errorBundlePretty e

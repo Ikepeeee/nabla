@@ -1,122 +1,124 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Nabla.Parser where
 
-import Data.Scientific
+import Control.Monad.Trans (MonadTrans (lift))
+import Data.Maybe (fromJust)
+import Data.Scientific (toRealFloat)
+import Data.Void
+import System.IO.Unsafe (unsafePerformIO)
 import Text.Megaparsec
 import Text.Megaparsec.Char
-import Data.Void
+    ( alphaNumChar, char, lowerChar, space1, string )
 import qualified Text.Megaparsec.Char.Lexer as L
-import Control.Monad.Combinators.Expr
+import Control.Monad.Combinators.Expr (makeExprParser, Operator(..))
 import Language.Nabla.AST
-import Data.Text (Text, unpack, pack)
 
-import Debug.Trace
+type Parser = Parsec Void String
 
-type Parser = Parsec Void Text
-
-pFun :: Parser Expr
+pFun :: Parser NFunc
 pFun = do
-  lexeme (char '\\')
-  arg <- tIdent
-  lexeme (string "->")
-  Fun arg <$> pExpr
-
-pTypedExpr :: Parser TypedExpr
-pTypedExpr = TypedExpr <$> pExpr <*> optional (lexeme (string ":") *> pSieve)
-
-pSieve :: Parser Sieve
-pSieve = do
-  lexeme (char '{')
   name <- tIdent
-  lexeme (char ':')
-  t <- pType
-  lexeme (char '|')
-  e <- pExpr
-  lexeme (char '}')
-  return $ Sieve t (Fun name e)
+  lexeme $ char '('
+  args <- pArg `sepBy` lexeme (char ',')
+  lexeme $ char ')'
+  lexeme $ string "->"
+  expr <- pExpr
+  lexeme $ string ":"
+  (argName, t, cond) <- pSieve
+  pure $ NFunc args expr argName t cond
 
-pType :: Parser Type
-pType = do
-  ts <- choice
-    [ TNum <$ lexeme (string "Num")
-    , TBool <$ lexeme (string "Bool")
-    ] `sepBy1` lexeme (string "->")
-  return $ f ts
-  where
-    f [t] = t
-    f (t:ts) = TFun t (f ts)
+pArg :: Parser NArg
+pArg = do
+  arg <- tIdent
+  lexeme $ string ":"
+  (_, t, cond) <- pSieve
+  pure $ NArg arg t cond
 
-tIdent :: Parser String
-tIdent = lexeme ((:) <$> lowerChar  <*> many alphaNumChar <?> "variable")
 
-pNum :: Parser Expr
-pNum = Num . toRealFloat <$> lexeme L.scientific
+pSieve :: Parser (String, TypeName, NValue)
+pSieve = do
+  lexeme $ char '{'
+  argName <- tIdent
+  lexeme $ char ':'
+  t <- lexeme $ string "Double" <|> string "Bool" <|> string "String"
+  lexeme $ char '|'
+  expr <- pExpr
+  lexeme $ char '}'
+  pure (argName, t, expr)
 
-pBool :: Parser Expr
-pBool = Bool <$> lexeme (choice [tTrue, tFalse])
-  where
-    tTrue = True <$ string "True"
-    tFalse =False <$ string "False"
+pExpr :: Parser NValue
+pExpr = makeExprParser pTerm operatorTable <?> "expression"
+
+operatorTable :: [[Operator Parser NValue]]
+operatorTable =
+  [ [ prefix "-" (NUni "-")
+    , prefix "+" id
+    ]
+  , [ binary "*" (NBin "*")
+    , binary "/" (NBin "/")
+    ]
+  , [ binary "+" (NBin "+")
+    , binary "-" (NBin "-")
+    ]
+  , [ binary ">=" (NBin ">=")
+    , binary ">" (NBin ">")
+    , binary "<=" (NBin "<=")
+    , binary "<" (NBin "<")
+    , binary "==" (NBin "==")
+    , binary "!=" (NBin "/=")
+    , binary "~=" (NBin "~=")
+    ]
+  , [ prefix "!" (NUni "!")
+    ]
+  , [ binary "&&" (NBin "&&")
+    , binary "||" (NBin "||")
+    ]
+  ]
 
 parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")
+parens = between (string "(") (string ")")
 
-pTerm :: Parser Expr
+pTerm :: Parser NValue
 pTerm = choice
   [ parens pExpr
-  , Var <$> tIdent
+  , pIdent
   , pNum
   , pBool
-  , pFun
-  ]
+  , pString
+  , pRegex
+  ] <?> "term"
 
-pExpr :: Parser Expr
-pExpr = makeExprParser pTerm operatorTable
+binary :: String -> (NValue -> NValue -> NValue) -> Operator Parser NValue
+binary  name f = InfixL  (f <$ lexeme (string name))
 
-operatorTable :: [[Operator Parser Expr]]
-operatorTable =
-  [ [ prefix (oneOfSymbol ["-", "+", "!"]) unaryOp
-    ]
-  , [ binary (oneOfSymbol ["*", "/"]) binaryOp
-    ]
-  , [ binary (oneOfSymbol ["+", "-"]) binaryOp
-    ]
-  , [ binary (oneOfSymbol [">=", "<=", ">", "<", "=="]) binaryOp
-    ]
-  , [ binary (oneOfSymbol ["||", "&&"]) binaryOp
-    ]
-  , [ binary pUserBinary binaryOp
-    ]
-  ]
+prefix, postfix :: String -> (NValue -> NValue) -> Operator Parser NValue
+prefix  name f = Prefix  (f <$ lexeme (string name))
+postfix name f = Postfix (f <$ lexeme (string name))
 
-oneOfSymbol :: [Text] -> Parser Text
-oneOfSymbol names = choice (map symbol names)
+pBool :: Parser NValue
+pBool = lexeme (choice
+  [ NBool True <$ string "True"
+  , NBool False <$ string "False"
+  ] <?> "bool")
 
-pUserBinary :: Parser Text
-pUserBinary = symbol "`" *> (pack <$> manyTill asciiChar (symbol "`"))
+pRegex :: Parser NValue
+pRegex = NRegex <$> lexeme (char '/' *> manyTill L.charLiteral (char '/')) <?> "regex"
 
-binary :: Parser Text -> (String -> Expr -> Expr -> Expr) -> Operator Parser Expr
-binary name f = InfixL  (f . unpack <$> name)
+pString :: Parser NValue
+pString = NString <$> lexeme (char '\'' *> manyTill L.charLiteral (char '\'')) <?> "string"
 
-prefix, postfix :: Parser Text -> (String -> Expr -> Expr) -> Operator Parser Expr
-prefix  name f = Prefix  (f . unpack <$> name)
-postfix name f = Postfix (f . unpack <$> name)
+pNum :: Parser NValue
+pNum = NDouble <$> L.signed sc (lexeme $ toRealFloat <$> L.scientific) <?> "double"
 
-unaryOp :: String -> Expr -> Expr
-unaryOp name e = App (Var ("[unary]" <> name)) e
+pIdent :: Parser NValue
+pIdent = NVar <$> tIdent
 
-binaryOp :: String -> Expr -> Expr -> Expr
-binaryOp name l r = App (App (Var name) l) r
+tIdent :: Parser String
+tIdent = lexeme ((:) <$> lowerChar <*> many alphaNumChar <?> "variable")
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
-symbol :: Text -> Parser Text
-symbol = L.symbol sc
-
 sc :: Parser ()
-sc = L.space
-  space1
-  (L.skipLineComment "//")
-  (L.skipBlockComment "/*" "*/")
+sc = L.space space1 (L.skipLineComment "//") (L.skipBlockComment "/*" "*/")

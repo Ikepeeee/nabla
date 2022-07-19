@@ -1,24 +1,21 @@
 module Language.Nabla.Printer where
 
+import Data.List
 import Language.Nabla.AST
 
-data JSCode
-  = JSExpr String
-  | JSFun (String -> JSCode)
+transFunc :: NFunc -> String
+transFunc (NFunc args body _ _ _) = "(" <> intercalate ", " (map transArg args) <> ")" <> " => " <> transNValue body
 
-printExpr :: Expr -> JSCode
-printExpr (Num n) = JSExpr $ show n
-printExpr (Bool e)
-  | True = JSExpr "true"
-  | False = JSExpr "false"
-printExpr (Var "+") = jsBinary "+"
-printExpr (Var name) = JSExpr name
-printExpr (App f x) = do
-  let f' = printExpr f
-  let (JSExpr e) = printExpr x
-  case f' of
-    (JSFun f'') -> f'' e
--- printExpr (Fun )
+transArg :: NArg -> String
+transArg (NArg name _ _) = name
 
-jsBinary :: String -> JSCode
-jsBinary op = JSFun $ \a -> JSFun $ \b -> JSExpr $ "(" <> a <> op <> b <> ")"
+transNValue :: NValue -> String
+transNValue (NDouble v) = show v
+transNValue (NBool True) = "true"
+transNValue (NBool False) = "false"
+transNValue (NString v) = "'" <> v <> "'"
+transNValue (NRegex v) = "/" <> v <> "/i"
+transNValue (NVar v) = v
+transNValue (NIte c a b) = "(" <> transNValue c <> " ? " <> transNValue a <> " : " <> transNValue b <> ")"
+transNValue (NBin op a b) = "(" <> transNValue a <> " " <> op <> " " <> transNValue b <> ")"
+transNValue (NUni op v) = "(" <> op <> " " <> transNValue v <> ")"
