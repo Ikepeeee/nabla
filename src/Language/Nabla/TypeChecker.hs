@@ -38,7 +38,7 @@ infer _ _ (NBool _) = "Bool"
 infer _ _ (NString _) = "String"
 infer _ _ (NRegex _) = "Regex"
 infer _ args (NVar name) = do
-  let sx = fromJust $ lookup (traceShow name name) (traceShow (map fst args) args)
+  let sx = fromJust $ lookup name args
   case sx of
     (SXDouble _) -> "Double"
     (SXBool _) -> "Bool"
@@ -183,6 +183,8 @@ _toSX fs args (NUni "-" v) = do
   pure $ SXDouble $ - v'
 _toSX _ _ (NUni _ _) = undefined
 -- TODO Fix here
-_toSX fs args (NApp name _) = do
-  let (NFunc _ _ condArg _ cond) = fromJust $ lookup name fs
-  _toSX fs args cond
+_toSX fs args (NApp name vs) = do
+  let (NFunc args' body _ _ _) = fromJust $ lookup name fs
+  vs' <- mapM (_toSX fs args) vs
+  let argNames = map argName args'
+  _toSX fs (args <> zip argNames vs') body

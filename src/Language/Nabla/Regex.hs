@@ -93,5 +93,5 @@ c = exactly . (: []) <$>
 w :: Parser RegExp
 w = string "\\w" $> (asciiLetter + digit)
  <|> string "\\d" $> digit
- <|> char '.' $> Range '!' '~'
+ <|> char '.' $> All
  <|> char '[' *> (Union <$> some atom) <* char ']'

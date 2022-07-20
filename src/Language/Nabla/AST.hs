@@ -4,8 +4,10 @@ type TypeName = String
 
 data NFunc = NFunc [NArg] NValue String TypeName NValue deriving (Show)
 
-data NArg = NArg String TypeName NValue   deriving (Show)
+data NArg = NArg String TypeName NValue deriving (Show)
 
+argName :: NArg -> String
+argName (NArg name _ _) = name
 data NValue
   = NDouble Double
   | NBool Bool
