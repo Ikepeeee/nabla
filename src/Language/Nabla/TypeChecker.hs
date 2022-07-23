@@ -41,12 +41,12 @@ sxVarCreators =
   , ("String", fmap SXString . sString)
   ]
 
-findVar :: String -> [(String, SX)] -> SX
-findVar varName vars = do
+findVar :: String -> String -> [(String, SX)] -> SX
+findVar message varName vars = do
   let var = lookup varName vars
   case var of
     (Just var) -> var
-    Nothing -> error $ "not find var: " <> varName
+    Nothing -> error $ "not find var " <> message <> ": " <> varName
 
 findFunc :: String -> [(String, NFunc)] -> NFunc
 findFunc fnName fns = do
@@ -61,7 +61,7 @@ infer _ _ (NBool _) = "Bool"
 infer _ _ (NString _) = "String"
 infer _ _ (NRegex _) = "Regex"
 infer _ args (NVar name) = do
-  let sx = findVar name args
+  let sx = findVar "infer" name args
   case sx of
     (SXDouble _) -> "Double"
     (SXBool _) -> "Bool"
@@ -88,9 +88,11 @@ infer _ _ NBin {} = undefined
 infer _ _ (NUni "!" _) = "Double"
 infer _ _ (NUni "-" _) = "Double"
 infer _ _ (NUni _ _) = undefined
-infer fs args (NApp name _) = do
-  let (NFunc _ v _ _ _) = findFunc name fs
-  infer fs args v
+infer fs args (NApp name vs) = do
+  let f = lookup name fs
+  case f of
+    Just (NFunc _ _ _ t _) -> t
+    Nothing -> error $ "not found functions: " <> name
 
 data SX
   = SXBool SBool
@@ -103,7 +105,7 @@ _toSX _ _ (NDouble v) = pure $ SXDouble $ literal  v
 _toSX _ _ (NBool v) = pure $ SXBool $ literal v
 _toSX _ _ (NString v) = pure $ SXString $ literal v
 _toSX _ _ (NRegex v) = pure $ SXRegex $ fromRight undefined (regex v)
-_toSX _ args (NVar name) = pure $ findVar name args
+_toSX _ args (NVar name) = pure $ findVar "arg" name args
 _toSX fs args (NIte c a b) = do
   (SXBool c') <- _toSX fs args c
   (SXDouble a') <- _toSX fs args a
@@ -114,19 +116,19 @@ _toSX fs args (NBin opName a b) = do
   let bType = infer fs args b
   let op = lookup [opName, aType, bType] functions
   case op of
-    (Just op) -> do
+    (Just (_, op)) -> do
       a <- _toSX fs args a
       b <- _toSX fs args b
       pure $ op [a, b]
-    Nothing -> error $ "not found op: " <> "+" <> aType <> " " <> bType
+    Nothing -> error $ "not found op: " <> opName <> aType <> " " <> bType
 _toSX fs args (NUni opName a) = do
   let aType = infer fs args a
   let op = lookup [opName, aType] functions
   case op of
-    (Just op) -> do
+    (Just (_, op)) -> do
       a <- _toSX fs args a
       pure $ op [a]
-    Nothing -> error $ "not found op: " <> "(+): " <> aType
+    Nothing -> error $ "not found op: " <> opName <> aType
 -- TODO Fix here
 _toSX fs args (NApp name vs) = do
   let (NFunc args' body _ _ _) = findFunc name fs
@@ -134,26 +136,26 @@ _toSX fs args (NApp name vs) = do
   let argNames = map argName args'
   _toSX fs (args <> zip argNames vs') body
 
+functions :: [([String], (String, [SX] -> SX))]
 functions =
-  [ (["+", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXDouble (a + b))
-  , (["+", "String", "String"], \[SXString a, SXString b] -> SXString (a S.++ b))
-  , (["-", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXDouble (a - b))
-  , (["*", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXDouble (a * b))
-  , (["/", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXDouble (a / b))
-  , (["&&", "Bool", "Bool"], \[SXBool a, SXBool b] -> SXBool (a .&& b))
-  , (["||", "Bool", "Bool"], \[SXBool a, SXBool b] -> SXBool (a .|| b))
-  , (["<=", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXBool (a .<= b))
-  , (["<", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXBool (a .< b))
-  , ([">=", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXBool (a .>= b))
-  , ([">", "Double", "Double"], \[SXDouble a, SXDouble b]-> SXBool (a .> b))
-  , (["==", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXBool (a .== b))
-  , (["==", "String", "String"], \[SXString a, SXString b] -> SXBool (a .== b))
-  , (["==", "Bool", "Bool"], \[SXBool a, SXBool b] -> SXBool (a .== b))
-  , (["/=", "Double", "Double"], \[SXDouble a, SXDouble b] -> SXBool (a ./= b))
-  , (["/=", "String", "String"], \[SXString a, SXString b] -> SXBool (a ./= b))
-  , (["/=", "Bool", "Bool"], \[SXBool a, SXBool b] -> SXBool (a ./= b))
-  , (["/=", "Bool", "Bool"], \[SXBool a, SXBool b] -> SXBool (a ./= b))
-  , (["~=", "String", "Regex"], \[SXString a, SXRegex b] -> SXBool (a `match` b))
-  , (["!", "Bool"], \[SXBool a] -> SXBool $ sNot a)
-  , (["-", "Double"], \[SXDouble a] -> SXDouble $ - a)
+  [ (["+", "Double", "Double"], ("Double", \[SXDouble a, SXDouble b] -> SXDouble (a + b)))
+  , (["+", "String", "String"], ("String", \[SXString a, SXString b] -> SXString (a S.++ b)))
+  , (["-", "Double", "Double"], ("Double", \[SXDouble a, SXDouble b] -> SXDouble (a - b)))
+  , (["*", "Double", "Double"], ("Double", \[SXDouble a, SXDouble b] -> SXDouble (a * b)))
+  , (["/", "Double", "Double"], ("Double", \[SXDouble a, SXDouble b] -> SXDouble (a / b)))
+  , (["&&", "Bool", "Bool"], ("Bool", \[SXBool a, SXBool b] -> SXBool (a .&& b)))
+  , (["||", "Bool", "Bool"], ("Bool", \[SXBool a, SXBool b] -> SXBool (a .|| b)))
+  , (["<=", "Double", "Double"], ("Bool", \[SXDouble a, SXDouble b] -> SXBool (a .<= b)))
+  , (["<", "Double", "Double"], ("Bool", \[SXDouble a, SXDouble b] -> SXBool (a .< b)))
+  , ([">=", "Double", "Double"], ("Bool", \[SXDouble a, SXDouble b] -> SXBool (a .>= b)))
+  , ([">", "Double", "Double"], ("Bool", \[SXDouble a, SXDouble b]-> SXBool (a .> b)))
+  , (["==", "Double", "Double"], ("Bool", \[SXDouble a, SXDouble b] -> SXBool (a .== b)))
+  , (["==", "String", "String"], ("Bool", \[SXString a, SXString b] -> SXBool (a .== b)))
+  , (["==", "Bool", "Bool"], ("Bool", \[SXBool a, SXBool b] -> SXBool (a .== b)))
+  , (["/=", "Double", "Double"], ("Bool", \[SXDouble a, SXDouble b] -> SXBool (a ./= b)))
+  , (["/=", "String", "String"], ("Bool", \[SXString a, SXString b] -> SXBool (a ./= b)))
+  , (["/=", "Bool", "Bool"], ("Bool", \[SXBool a, SXBool b] -> SXBool (a ./= b)))
+  , (["~=", "String", "Regex"], ("Bool", \[SXString a, SXRegex b] -> SXBool (a `match` b)))
+  , (["!", "Bool"], ("Bool", \[SXBool a] -> SXBool $ sNot a))
+  , (["-", "Double"], ("Double", \[SXDouble a] -> SXDouble $ - a))
   ]
