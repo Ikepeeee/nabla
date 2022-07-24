@@ -54,29 +54,35 @@ pExpr = makeExprParser pTerm operatorTable <?> "expression"
 
 operatorTable :: [[Operator Parser NValue]]
 operatorTable =
-  [ [ prefix "-" (NUni "-")
+  [ [ prefix "-" (uni "-")
     , prefix "+" id
     ]
-  , [ binary "*" (NBin "*")
-    , binary "/" (NBin "/")
+  , [ binary "*" (bin "*")
+    , binary "/" (bin "/")
     ]
-  , [ binary "+" (NBin "+")
-    , binary "-" (NBin "-")
+  , [ binary "+" (bin "+")
+    , binary "-" (bin "-")
     ]
-  , [ binary ">=" (NBin ">=")
-    , binary ">" (NBin ">")
-    , binary "<=" (NBin "<=")
-    , binary "<" (NBin "<")
-    , binary "==" (NBin "==")
-    , binary "!=" (NBin "/=")
-    , binary "~=" (NBin "~=")
+  , [ binary ">=" (bin ">=")
+    , binary ">" (bin ">")
+    , binary "<=" (bin "<=")
+    , binary "<" (bin "<")
+    , binary "==" (bin "==")
+    , binary "!=" (bin "/=")
+    , binary "~=" (bin "~=")
     ]
-  , [ prefix "!" (NUni "!")
+  , [ prefix "!" (uni "!")
     ]
-  , [ binary "&&" (NBin "&&")
-    , binary "||" (NBin "||")
+  , [ binary "&&" (bin "&&")
+    , binary "||" (bin "||")
     ]
   ]
+
+uni :: String -> NValue -> NValue
+uni op a = NFixtureApp op [a]
+
+bin :: String -> NValue -> NValue -> NValue
+bin op a b = NFixtureApp op [a, b]
 
 parens :: Parser a -> Parser a
 parens = between (string "(") (string ")")

@@ -4,8 +4,6 @@ import Language.Nabla.AST
 import Data.SBV
 import Data.SBV.String as S
 import Data.SBV.RegExp
-import Data.SBV.Dynamic
-import Data.Maybe
 import Data.Either (fromRight)
 import Text.Megaparsec (parse)
 import Language.Nabla.Regex (regex)
@@ -68,19 +66,12 @@ infer _ args (NVar name) = do
     (SXString _) -> "String"
     (SXRegex _) -> "Regex"
 infer _ _ NIte {} = "Double"
-infer fs args (NBin opName a b) = do
-  let aType = infer fs args a
-  let bType = infer fs args b
-  let op = lookup [opName, aType, bType] functions
+infer fs args (NFixtureApp opName vs) = do
+  let ts = map (infer fs args) vs
+  let op = lookup (opName:ts) functions
   case op of
     (Just (t, _)) -> t
-    Nothing -> error $ "not found op: " <> opName <> aType <> " " <> bType
-infer fs args (NUni opName a) = do
-  let aType = infer fs args a
-  let op = lookup [opName, aType] functions
-  case op of
-    (Just (t, _)) -> t
-    Nothing -> error $ "not found op: " <> opName <> aType
+    Nothing -> error $ "not found op: " <> opName <> show ts
 infer fs args (NApp name vs) = do
   let f = lookup name fs
   case f of
@@ -104,24 +95,14 @@ _toSX fs args (NIte c a b) = do
   (SXDouble a') <- _toSX fs args a
   (SXDouble b') <- _toSX fs args b
   pure $ SXDouble $ ite c' a' b'
-_toSX fs args (NBin opName a b) = do
-  let aType = infer fs args a
-  let bType = infer fs args b
-  let op = lookup [opName, aType, bType] functions
+_toSX fs args (NFixtureApp opName vs) = do
+  let ts = map (infer fs args) vs
+  let op = lookup (opName:ts) functions
   case op of
     (Just (_, op)) -> do
-      a <- _toSX fs args a
-      b <- _toSX fs args b
-      pure $ op [a, b]
-    Nothing -> error $ "not found op: " <> opName <> aType <> " " <> bType
-_toSX fs args (NUni opName a) = do
-  let aType = infer fs args a
-  let op = lookup [opName, aType] functions
-  case op of
-    (Just (_, op)) -> do
-      a <- _toSX fs args a
-      pure $ op [a]
-    Nothing -> error $ "not found op: " <> opName <> aType
+      vs' <- mapM (_toSX fs args) vs
+      pure $ op vs'
+    Nothing -> error $ "not found op: " <> opName <> show ts
 -- TODO Fix here
 _toSX fs args (NApp name vs) = do
   let (NFunc args' body _ _ _) = findFunc name fs

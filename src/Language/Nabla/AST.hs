@@ -15,7 +15,6 @@ data NValue
   | NRegex String
   | NVar String
   | NIte NValue NValue NValue
-  | NBin String NValue NValue
-  | NUni String NValue
+  | NFixtureApp String [NValue]
   | NApp String [NValue]
   deriving (Show)
