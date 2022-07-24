@@ -68,26 +68,19 @@ infer _ args (NVar name) = do
     (SXString _) -> "String"
     (SXRegex _) -> "Regex"
 infer _ _ NIte {} = "Double"
-infer fs args (NBin "+" a b) = do
+infer fs args (NBin opName a b) = do
   let aType = infer fs args a
   let bType = infer fs args b
-  case [aType, bType] of
-    ["Double", "Double"] -> "Double"
-    ["String", "String"] -> "String"
-    _ -> undefined
-infer _ _ (NBin "-" _ _) = "Double"
-infer _ _ (NBin "*" _ _) = "Double"
-infer _ _ (NBin "/" _ _) = "Double"
-infer _ _ (NBin ">=" _ _) = "Bool"
-infer _ _ (NBin ">" _ _) = "Bool"
-infer _ _ (NBin "<" _ _) = "Bool"
-infer _ _ (NBin "<=" _ _) = "Bool"
-infer _ _ (NBin "&&" _ _) = "Bool"
-infer _ _ (NBin "||" _ _) = "Bool"
-infer _ _ NBin {} = undefined
-infer _ _ (NUni "!" _) = "Double"
-infer _ _ (NUni "-" _) = "Double"
-infer _ _ (NUni _ _) = undefined
+  let op = lookup [opName, aType, bType] functions
+  case op of
+    (Just (t, _)) -> t
+    Nothing -> error $ "not found op: " <> opName <> aType <> " " <> bType
+infer fs args (NUni opName a) = do
+  let aType = infer fs args a
+  let op = lookup [opName, aType] functions
+  case op of
+    (Just (t, _)) -> t
+    Nothing -> error $ "not found op: " <> opName <> aType
 infer fs args (NApp name vs) = do
   let f = lookup name fs
   case f of
