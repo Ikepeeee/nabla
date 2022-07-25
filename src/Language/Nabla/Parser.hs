@@ -15,10 +15,10 @@ import Language.Nabla.AST
 
 type Parser = Parsec Void String
 
-pFuns :: Parser [(String, NFunc)]
+pFuns :: Parser [(String, NFun)]
 pFuns = many pFun
 
-pFun :: Parser (String, NFunc)
+pFun :: Parser (String, NFun)
 pFun = do
   name <- tIdent
   lexeme $ char '('
@@ -27,18 +27,16 @@ pFun = do
   lexeme $ string "->"
   expr <- pExpr
   lexeme $ string ":"
-  (argName, t, cond) <- pSieve
-  pure (name, NFunc args expr argName t cond)
+  t <- pSieve
+  pure (name, NFun args expr t)
 
 pArg :: Parser NArg
 pArg = do
   arg <- tIdent
   lexeme $ string ":"
-  (_, t, cond) <- pSieve
-  pure $ NArg arg t cond
+  NArg arg <$> pSieve
 
-
-pSieve :: Parser (String, TypeName, NValue)
+pSieve :: Parser NSieve
 pSieve = do
   lexeme $ char '{'
   argName <- tIdent
@@ -47,7 +45,7 @@ pSieve = do
   lexeme $ char '|'
   expr <- pExpr
   lexeme $ char '}'
-  pure (argName, t, expr)
+  pure $ NSieve argName t expr
 
 pExpr :: Parser NValue
 pExpr = makeExprParser pTerm operatorTable <?> "expression"

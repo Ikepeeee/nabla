@@ -2,12 +2,14 @@ module Language.Nabla.AST where
 
 type TypeName = String
 
-data NFunc = NFunc [NArg] NValue String TypeName NValue deriving (Show)
+data NFun = NFun [NArg] NValue NSieve deriving (Show)
 
-data NArg = NArg String TypeName NValue deriving (Show)
+data NSieve = NSieve String TypeName NValue deriving (Show)
+
+data NArg = NArg String NSieve deriving (Show)
 
 argName :: NArg -> String
-argName (NArg name _ _) = name
+argName (NArg name _) = name
 data NValue
   = NDouble Double
   | NBool Bool
