@@ -40,32 +40,19 @@ sxVarCreators =
   , ("String", fmap SDString . sString)
   ]
 
-findVar :: String -> String -> [(String, SData)] -> SData
-findVar message varName vars = do
-  let var = lookup varName vars
-  case var of
-    (Just var) -> var
-    Nothing -> error $ "not find var " <> message <> ": " <> varName
-
-findFunc :: String -> [(String, NFun)] -> NFun
-findFunc fnName fns = do
-  let fn = lookup fnName fns
-  case fn of
-    (Just fn) -> fn
-    Nothing -> error $ "not find function: " <> fnName
-
 infer :: [(String, NFun)] -> [(String, SData)] -> NValue -> String
 infer _ _ (NDouble _) = "Double"
 infer _ _ (NBool _) = "Bool"
 infer _ _ (NString _) = "String"
 infer _ _ (NRegex _) = "Regex"
 infer _ args (NVar name) = do
-  let sx = findVar "infer" name args
+  let sx = lookup name args
   case sx of
-    (SDDouble _) -> "Double"
-    (SDBool _) -> "Bool"
-    (SDString _) -> "String"
-    (SDRegex _) -> "Regex"
+    Just (SDDouble _) -> "Double"
+    Just (SDBool _) -> "Bool"
+    Just (SDString _) -> "String"
+    Just (SDRegex _) -> "Regex"
+    Nothing -> error $ "not find var " <> ": " <> name
 infer _ _ NIte {} = "Double"
 infer fs args (NFixtureApp opName vs) = do
   let ts = map (infer fs args) vs
@@ -85,12 +72,19 @@ data SData
   | SDString SString
   | SDRegex RegExp
 
-toSData :: [(String, NFun)] -> [(String, SData)] -> NValue -> Symbolic (SData, [SBool])
+type Fun = (String, NFun)
+type SDataVar = (String, SData)
+
+toSData :: [Fun] -> [SDataVar] -> NValue -> Symbolic (SData, [SBool])
 toSData _ _ (NDouble v) = pure (SDDouble $ literal v, [])
 toSData _ _ (NBool v) = pure (SDBool $ literal v, [])
 toSData _ _ (NString v) = pure (SDString $ literal v, [])
 toSData _ _ (NRegex v) = pure (SDRegex $ fromRight undefined (regex v), [])
-toSData _ args (NVar name) = pure (findVar "arg" name args, [])
+toSData _ args (NVar name) = do
+  let var = lookup name args
+  case var of
+    Just a -> pure (a, [])
+    Nothing -> error $ "not find var " <> ": " <> name
 toSData fs args (NIte c a b) = do
   (SDBool c', c'') <- toSData fs args c
   (SDDouble a', a'') <- toSData fs args a
@@ -105,7 +99,9 @@ toSData fs args (NFixtureApp opName vs) = do
       pure (op (map fst vs'), L.concatMap snd vs')
     Nothing -> error $ "not found op: " <> opName <> show ts
 toSData fs args (NApp name _) = do
-  let (NFun _ _ (NSieve n t cond)) = findFunc name fs
+  (NFun _ _ (NSieve n t cond)) <- case lookup name fs of
+    Just f -> pure f
+    Nothing -> error $ "not find function: " <> name
   fnVar <- createType t name
   (SDBool cond', _) <- toSData fs [(n, fnVar)] cond
   pure (fnVar, [cond'])
