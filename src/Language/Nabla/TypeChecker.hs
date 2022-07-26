@@ -11,16 +11,22 @@ import Language.Nabla.Regex (regex)
 import Debug.Trace
 import GHC.IO (unsafePerformIO)
 
-createCond :: [(String, NFun)] -> NFun -> Symbolic SBool
+createCond :: [Fun] -> NFun -> Symbolic SBool
 createCond funs (NFun args body (NSieve n typeName cond)) = do
   sArgs <- mapM (createSArg funs) args
   let sArgs' = map fst sArgs
+  let actualRetType = infer funs sArgs' body
+  actualRetTypeVar <- sString "actualRetType"
+  expectedRetTypeVar <- sString "expectedRetType"
   (sBody, sCond1) <- toSData funs sArgs' body
   (SDBool sCond2, _) <- toSData funs [(n, sBody)] cond
   let sArgConds = map snd sArgs
-  pure $ foldr (.&&) sTrue (sArgConds <> sCond1) .=> sCond2
+  pure $ foldr (.&&) sTrue (sArgConds <> sCond1)
+    .&& actualRetTypeVar .== literal actualRetType
+    .&& expectedRetTypeVar .== literal typeName
+    .=> actualRetTypeVar .== expectedRetTypeVar .&& sCond2
 
-createSArg :: [(String, NFun)] -> NArg -> Symbolic ((String, SData), SBool)
+createSArg :: [Fun] -> NArg -> Symbolic ((String, SData), SBool)
 createSArg fs (NArg name (NSieve n typeName cond)) = do
   v <- createType typeName name
   (SDBool c, _) <- toSData fs [(name, v)] cond
@@ -40,7 +46,7 @@ sxVarCreators =
   , ("String", fmap SDString . sString)
   ]
 
-infer :: [(String, NFun)] -> [(String, SData)] -> NValue -> String
+infer :: [Fun] -> [SDataVar] -> NValue -> String
 infer _ _ (NDouble _) = "Double"
 infer _ _ (NBool _) = "Bool"
 infer _ _ (NString _) = "String"
@@ -52,7 +58,7 @@ infer _ args (NVar name) = do
     Just (SDBool _) -> "Bool"
     Just (SDString _) -> "String"
     Just (SDRegex _) -> "Regex"
-    Nothing -> error $ "not find var " <> ": " <> name
+    Nothing -> error $ "not find var in infer" <> ": " <> name
 infer _ _ NIte {} = "Double"
 infer fs args (NFixtureApp opName vs) = do
   let ts = map (infer fs args) vs
@@ -84,7 +90,7 @@ toSData _ args (NVar name) = do
   let var = lookup name args
   case var of
     Just a -> pure (a, [])
-    Nothing -> error $ "not find var " <> ": " <> name
+    Nothing -> error $ "not find var in toSData" <> ": " <> name
 toSData fs args (NIte c a b) = do
   (SDBool c', c'') <- toSData fs args c
   (SDDouble a', a'') <- toSData fs args a
@@ -102,7 +108,7 @@ toSData fs args (NApp name _) = do
   (NFun _ _ (NSieve n t cond)) <- case lookup name fs of
     Just f -> pure f
     Nothing -> error $ "not find function: " <> name
-  fnVar <- createType t name
+  fnVar <- createType t n
   (SDBool cond', _) <- toSData fs [(n, fnVar)] cond
   pure (fnVar, [cond'])
 
