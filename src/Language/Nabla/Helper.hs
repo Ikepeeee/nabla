@@ -4,7 +4,8 @@ import Data.SBV ( proveWith, z3, SBool, Symbolic, ThmResult )
 import Text.Megaparsec ( runParser, errorBundlePretty )
 import Language.Nabla.Parser ( pFuns )
 import Language.Nabla.Printer
-import Language.Nabla.TypeChecker ( createCond )
+import Language.Nabla.SieveChecker ( createCond )
+import Language.Nabla.TypeChecker (validFuns)
 
 execFun :: String -> [Symbolic SBool]
 execFun src = do
@@ -22,4 +23,13 @@ trans src = do
   let ret = runParser pFuns "test" src
   case ret of
     Right fs -> putStrLn $ intercalate "\n" $ map (transFunc . snd) fs
+    Left e -> error $ errorBundlePretty e
+
+valid :: String -> IO ()
+valid src = do
+  let ret = runParser pFuns "test" src
+  case ret of
+    Right fs -> case validFuns fs of
+      Right _ -> pure ()
+      Left e -> error e
     Left e -> error $ errorBundlePretty e

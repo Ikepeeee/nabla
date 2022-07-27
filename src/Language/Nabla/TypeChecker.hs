@@ -1,137 +1,94 @@
 module Language.Nabla.TypeChecker where
 
+import Data.List ( find )
 import Language.Nabla.AST
-import Data.List as L
-import Data.SBV
-import Data.SBV.String as S
-import Data.SBV.RegExp
-import Data.Either (fromRight)
-import Text.Megaparsec (parse)
-import Language.Nabla.Regex (regex)
+    ( NValue(..), NArg(..), NSieve(NSieve), NFun(..) )
+import Control.Monad (when)
+import Data.Functor (($>))
 import Debug.Trace
-import GHC.IO (unsafePerformIO)
 
-createCond :: [Fun] -> NFun -> Symbolic SBool
-createCond funs (NFun args body (NSieve n typeName cond)) = do
-  sArgs <- mapM (createSArg funs) args
-  let sArgs' = map fst sArgs
-  let actualRetType = infer funs sArgs' body
-  actualRetTypeVar <- sString "actualRetType"
-  expectedRetTypeVar <- sString "expectedRetType"
-  (sBody, sCond1) <- toSData funs sArgs' body
-  (SDBool sCond2, _) <- toSData funs [(n, sBody)] cond
-  let sArgConds = map snd sArgs
-  pure $ foldr (.&&) sTrue (sArgConds <> sCond1)
-    .&& actualRetTypeVar .== literal actualRetType
-    .&& expectedRetTypeVar .== literal typeName
-    .=> actualRetTypeVar .== expectedRetTypeVar .&& sCond2
+show' :: Show a => a -> a
+show' a = traceShow a a
 
-createSArg :: [Fun] -> NArg -> Symbolic ((String, SData), SBool)
-createSArg fs (NArg name (NSieve n typeName cond)) = do
-  v <- createType typeName name
-  (SDBool c, _) <- toSData fs [(name, v)] cond
-  pure ((name, v), c)
+validFuns :: [(String, NFun)] -> Either String ()
+validFuns funs = mapM (validFun funs) funs $> ()
 
-createType :: String -> String -> Symbolic SData
-createType typeName = do
-  let sxVarCreator = lookup typeName sxVarCreators
-  case sxVarCreator of
-    (Just sxVarCreator) -> sxVarCreator
-    Nothing -> error $ "not find type: " <> typeName
+validFun :: [(String, NFun)] -> (String, NFun) -> Either String FunType
+validFun funs (name, NFun args body sieve) = do
+  let funTypes = map definedFun funs
+  let argTypes = map definedArg args
+  let (_, argType, retType) = definedFun (name, NFun args body sieve)
+  inferredRetType <- inferValue funTypes argTypes body
+  when (inferredRetType /= retType)
+    (Left$  show' $ "function " <> name <> " is not returned " <> retType)
+  pure (name, argType, retType)
 
-sxVarCreators :: [(String, String -> Symbolic SData)]
-sxVarCreators =
-  [ ("Double", fmap SDDouble . sDouble)
-  , ("Bool", fmap SDBool . sBool)
-  , ("String", fmap SDString . sString)
-  ]
+definedFun :: (String, NFun) -> FunType
+definedFun (name, NFun args _ (NSieve _ retType _))
+  = (name, map (snd . definedArg) args, retType)
 
-infer :: [Fun] -> [SDataVar] -> NValue -> String
-infer _ _ (NDouble _) = "Double"
-infer _ _ (NBool _) = "Bool"
-infer _ _ (NString _) = "String"
-infer _ _ (NRegex _) = "Regex"
-infer _ args (NVar name) = do
-  let sx = lookup name args
-  case sx of
-    Just (SDDouble _) -> "Double"
-    Just (SDBool _) -> "Bool"
-    Just (SDString _) -> "String"
-    Just (SDRegex _) -> "Regex"
-    Nothing -> error $ "not find var in infer" <> ": " <> name
-infer _ _ NIte {} = "Double"
-infer fs args (NFixtureApp opName vs) = do
-  let ts = map (infer fs args) vs
-  let op = lookup (opName:ts) functions
-  case op of
-    (Just (t, _)) -> t
-    Nothing -> error $ "not found op: " <> opName <> show ts
-infer fs args (NApp name vs) = do
-  let f = lookup name fs
-  case f of
-    Just (NFun _ _ (NSieve _ t _)) -> t
-    Nothing -> error $ "not found functions: " <> name
+definedArg :: NArg -> ArgType
+definedArg (NArg name (NSieve _ t _)) = (name, t)
 
-data SData
-  = SDBool SBool
-  | SDDouble SDouble
-  | SDString SString
-  | SDRegex RegExp
+type ArgType = (String, String)
+type FunType = (String, [String], String)
 
-type Fun = (String, NFun)
-type SDataVar = (String, SData)
+inferValue :: [FunType] -> [ArgType] -> NValue -> Either String String
+inferValue _ _ (NDouble _) = pure "Double"
+inferValue _ _ (NBool _) = pure "Bool"
+inferValue _ _ (NString _) = pure "String"
+inferValue _ _ (NRegex _) = pure "Regex"
+inferValue _ args (NVar name) = lookup' ("not found arg: " <> name) name args
+inferValue funs args (NIte c a b) = do
+  cType <- inferValue funs args c
+  aType <- inferValue funs args a
+  bType <- inferValue funs args b
+  when (cType /= "Bool") (Left "if condition value should be Bool")
+  when (aType /= bType) (Left "then value and else value should be same type")
+  pure aType
+inferValue funs args (NFixtureApp name vs) = do
+  vTypes <- mapM (inferValue funs args) vs
+  (_, _, retType) <- find' ("not found fixture function: " <> name)
+    (\(name', argTypes, _) -> name' == name && argTypes == vTypes)
+    fixtureFunTypes
+  pure retType
+inferValue funs args (NApp name vs) = do
+  vTypes <- mapM (inferValue funs args) vs
+  (_, _, retType) <- find' ("not found function: " <> name)
+    (\(name', argTypes, _) -> name' == name && argTypes == vTypes)
+    funs
+  pure retType
 
-toSData :: [Fun] -> [SDataVar] -> NValue -> Symbolic (SData, [SBool])
-toSData _ _ (NDouble v) = pure (SDDouble $ literal v, [])
-toSData _ _ (NBool v) = pure (SDBool $ literal v, [])
-toSData _ _ (NString v) = pure (SDString $ literal v, [])
-toSData _ _ (NRegex v) = pure (SDRegex $ fromRight undefined (regex v), [])
-toSData _ args (NVar name) = do
-  let var = lookup name args
-  case var of
-    Just a -> pure (a, [])
-    Nothing -> error $ "not find var in toSData" <> ": " <> name
-toSData fs args (NIte c a b) = do
-  (SDBool c', c'') <- toSData fs args c
-  (SDDouble a', a'') <- toSData fs args a
-  (SDDouble b', b'') <- toSData fs args b
-  pure (SDDouble $ ite c' a' b', c'' <> a'' <> b'')
-toSData fs args (NFixtureApp opName vs) = do
-  let ts = map (infer fs args) vs
-  let op = lookup (opName:ts) functions
-  case op of
-    (Just (_, op)) -> do
-      vs' <- mapM (toSData fs args) vs
-      pure (op (map fst vs'), L.concatMap snd vs')
-    Nothing -> error $ "not found op: " <> opName <> show ts
-toSData fs args (NApp name _) = do
-  (NFun _ _ (NSieve n t cond)) <- case lookup name fs of
-    Just f -> pure f
-    Nothing -> error $ "not find function: " <> name
-  fnVar <- createType t n
-  (SDBool cond', _) <- toSData fs [(n, fnVar)] cond
-  pure (fnVar, [cond'])
+find' :: e -> (a -> Bool) -> [a] -> Either e a
+find' e a vs = case find a vs of
+  Just a -> Right a
+  Nothing -> Left e
 
-functions :: [([String], (String, [SData] -> SData))]
-functions =
-  [ (["+", "Double", "Double"], ("Double", \[SDDouble a, SDDouble b] -> SDDouble (a + b)))
-  , (["+", "String", "String"], ("String", \[SDString a, SDString b] -> SDString (a S.++ b)))
-  , (["-", "Double", "Double"], ("Double", \[SDDouble a, SDDouble b] -> SDDouble (a - b)))
-  , (["*", "Double", "Double"], ("Double", \[SDDouble a, SDDouble b] -> SDDouble (a * b)))
-  , (["/", "Double", "Double"], ("Double", \[SDDouble a, SDDouble b] -> SDDouble (a / b)))
-  , (["&&", "Bool", "Bool"], ("Bool", \[SDBool a, SDBool b] -> SDBool (a .&& b)))
-  , (["||", "Bool", "Bool"], ("Bool", \[SDBool a, SDBool b] -> SDBool (a .|| b)))
-  , (["<=", "Double", "Double"], ("Bool", \[SDDouble a, SDDouble b] -> SDBool (a .<= b)))
-  , (["<", "Double", "Double"], ("Bool", \[SDDouble a, SDDouble b] -> SDBool (a .< b)))
-  , ([">=", "Double", "Double"], ("Bool", \[SDDouble a, SDDouble b] -> SDBool (a .>= b)))
-  , ([">", "Double", "Double"], ("Bool", \[SDDouble a, SDDouble b]-> SDBool (a .> b)))
-  , (["==", "Double", "Double"], ("Bool", \[SDDouble a, SDDouble b] -> SDBool (a .== b)))
-  , (["==", "String", "String"], ("Bool", \[SDString a, SDString b] -> SDBool (a .== b)))
-  , (["==", "Bool", "Bool"], ("Bool", \[SDBool a, SDBool b] -> SDBool (a .== b)))
-  , (["/=", "Double", "Double"], ("Bool", \[SDDouble a, SDDouble b] -> SDBool (a ./= b)))
-  , (["/=", "String", "String"], ("Bool", \[SDString a, SDString b] -> SDBool (a ./= b)))
-  , (["/=", "Bool", "Bool"], ("Bool", \[SDBool a, SDBool b] -> SDBool (a ./= b)))
-  , (["~=", "String", "Regex"], ("Bool", \[SDString a, SDRegex b] -> SDBool (a `match` b)))
-  , (["!", "Bool"], ("Bool", \[SDBool a] -> SDBool $ sNot a))
-  , (["-", "Double"], ("Double", \[SDDouble a] -> SDDouble $ - a))
+lookup' :: Eq a => e -> a -> [(a, b)] -> Either e b
+lookup' e a vs = case lookup a vs of
+  Just b -> Right b
+  Nothing -> Left e
+
+fixtureFunTypes :: [FunType]
+fixtureFunTypes =
+  [ ("+", ["Double", "Double"], "Double")
+  , ("+", ["String", "String"], "String")
+  , ("-", ["Double", "Double"], "Double")
+  , ("*", ["Double", "Double"], "Double")
+  , ("/", ["Double", "Double"], "Double")
+  , ("&&", ["Bool", "Bool"], "Bool")
+  , ("||", ["Bool", "Bool"], "Bool")
+  , ("<=", ["Double", "Double"], "Bool")
+  , ("<", ["Double", "Double"], "Bool")
+  , (">=", ["Double", "Double"], "Bool")
+  , (">", ["Double", "Double"], "Bool")
+  , ("==", ["Double", "Double"], "Bool")
+  , ("==", ["String", "String"], "Bool")
+  , ("==", ["Bool", "Bool"], "Bool")
+  , ("/=", ["Double", "Double"], "Bool")
+  , ("/=", ["String", "String"], "Bool")
+  , ("/=", ["Bool", "Bool"], "Bool")
+  , ("~=", ["String", "Regex"], "Bool")
+  , ("!", ["Bool"], "Bool")
+  , ("-", ["Double"], "Double")
   ]

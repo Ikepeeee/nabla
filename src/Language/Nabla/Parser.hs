@@ -16,7 +16,7 @@ import Language.Nabla.AST
 type Parser = Parsec Void String
 
 pFuns :: Parser [(String, NFun)]
-pFuns = many pFun
+pFuns = sc *> many pFun <* eof
 
 pFun :: Parser (String, NFun)
 pFun = do
