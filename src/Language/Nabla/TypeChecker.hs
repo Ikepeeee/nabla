@@ -48,13 +48,13 @@ inferValue funs args (NIte c a b) = do
   pure aType
 inferValue funs args (NFixtureApp name vs) = do
   vTypes <- mapM (inferValue funs args) vs
-  (_, _, retType) <- find' ("not found fixture function: " <> name)
+  (_, _, retType) <- find' ("not found fixture function: " <> name <> " with argument type " <> show vTypes)
     (\(name', argTypes, _) -> name' == name && argTypes == vTypes)
     fixtureFunTypes
   pure retType
 inferValue funs args (NApp name vs) = do
   vTypes <- mapM (inferValue funs args) vs
-  (_, _, retType) <- find' ("not found function: " <> name)
+  (_, _, retType) <- find' ("not found function: " <> name <> " with argument type " <> show vTypes)
     (\(name', argTypes, _) -> name' == name && argTypes == vTypes)
     funs
   pure retType
