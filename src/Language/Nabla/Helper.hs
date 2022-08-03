@@ -31,5 +31,5 @@ valid src = do
   case ret of
     Right fs -> case validFuns fs of
       Right _ -> pure ()
-      Left e -> error e
-    Left e -> error $ errorBundlePretty e
+      Left e -> putStrLn e
+    Left e -> putStrLn $ errorBundlePretty e

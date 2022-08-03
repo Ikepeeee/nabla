@@ -14,14 +14,26 @@ validFuns :: [(String, NFun)] -> Either String ()
 validFuns funs = mapM (validFun funs) funs $> ()
 
 validFun :: [(String, NFun)] -> (String, NFun) -> Either String FunType
-validFun funs (name, NFun args body sieve) = do
+validFun funs (name, fun) = do
+  let (NFun args body sieve) = fun
+  let (NSieve sieveName sieveType sieveBody) = sieve
   let funTypes = map definedFun funs
   let argTypes = map definedArg args
-  let (_, argType, retType) = definedFun (name, NFun args body sieve)
+  let (_, argType, retType) = definedFun (name, fun)
+  mapM_ validArg args
+  inferredSieveBodyType <- inferValue [] [(sieveName, sieveType)] sieveBody
   inferredRetType <- inferValue funTypes argTypes body
   when (inferredRetType /= retType)
-    (Left$  show' $ "function " <> name <> " is not returned " <> retType)
+    (Left $ "function " <> name <> " is not returned " <> retType)
+  when (inferredSieveBodyType /= "Bool")
+    (Left $ "function " <> name <> " sieve is not returned Bool")
   pure (name, argType, retType)
+
+validArg :: NArg -> Either String ()
+validArg (NArg name (NSieve sieveName sieveType sieveBody)) = do
+  inferredSieveBodyType <- inferValue [] [(sieveName, sieveType)] sieveBody
+  when (inferredSieveBodyType /= "Bool")
+    (Left $ "argument " <> name <> " sieve is not returned Bool")
 
 definedFun :: (String, NFun) -> FunType
 definedFun (name, NFun args _ (NSieve _ retType _))
