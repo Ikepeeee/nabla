@@ -4,14 +4,14 @@ import Data.SBV ( proveWith, z3, SBool, Symbolic, ThmResult )
 import Text.Megaparsec ( runParser, errorBundlePretty )
 import Language.Nabla.Parser ( pFuns )
 import Language.Nabla.Printer
-import Language.Nabla.SieveChecker ( createCond )
+import Language.Nabla.SieveChecker ( createSFunCond )
 import Language.Nabla.TypeChecker (validFuns)
 
 execFun :: String -> [Symbolic SBool]
 execFun src = do
   let ret = runParser pFuns "test" src
   case ret of
-    Right fs -> map (createCond fs . snd) fs
+    Right fs -> map (createSFunCond fs . snd) fs
     Left e -> error $ errorBundlePretty e
 
 runFun :: String -> IO [ThmResult]

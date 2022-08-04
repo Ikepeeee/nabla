@@ -9,29 +9,38 @@ import Data.SBV.RegExp
 import Data.Either (fromRight)
 import Text.Megaparsec (parse)
 import Language.Nabla.Regex (regex)
+import Data.Functor (($>))
 import Debug.Trace
 import GHC.IO (unsafePerformIO)
+import Control.Monad (zipWithM)
 
-createCond :: [(String, NFun)] -> NFun -> Symbolic SBool
-createCond funs (NFun args body (NSieve n typeName cond)) = do
+createSFunCond :: [(String, NFun)] -> NFun -> Symbolic SBool
+createSFunCond funs fun = do
+  let (NFun args body sieve) = fun
+  let (NSieve sieveName sieveType sieveBody) = sieve
   let funTypes = map definedFun funs
   let argTypes = map definedArg args
-  sArgs <- mapM (createSArg funs) args
-  let sArgs' = map fst sArgs
-  let actualRetType = inferValue funTypes argTypes body
-  (sBody, sCond1) <- toSData funs sArgs' body
-  (SDBool sCond2, _) <- toSData funs [(n, sBody)] cond
-  let sArgConds = map snd sArgs
-  pure $ foldr (.&&) sTrue (sArgConds <> sCond1) .=> sCond2
+  sArgs <- mapM createSArgVar args
+  (sBody, funCallConds) <- toSData funs sArgs body
+  argConds <- zipWithM createSieveCond (map snd sArgs) (map pickSieve args)
+  bodyCond <- createSieveCond sBody sieve
+  pure $ foldl' (.&&) sTrue (argConds <> funCallConds) .=> bodyCond
 
-createSArg :: [(String, NFun)] -> NArg -> Symbolic ((String, SData), SBool)
-createSArg fs (NArg name (NSieve n typeName cond)) = do
-  v <- createType typeName name
-  (SDBool c, _) <- toSData fs [(name, v)] cond
-  pure ((name, v), c)
+pickSieve :: NArg -> NSieve
+pickSieve (NArg _ sieve) = sieve
 
-createType :: String -> String -> Symbolic SData
-createType typeName = do
+createSieveCond :: SData -> NSieve -> Symbolic SBool
+createSieveCond v (NSieve sieveName _ sieveBody) = do
+  (SDBool c, _) <- toSData [] [(sieveName, v)] sieveBody
+  pure c
+
+createSArgVar :: NArg -> Symbolic (String, SData)
+createSArgVar (NArg name (NSieve _ sieveType _)) = do
+  v <- createTypeVar sieveType name
+  pure (name, v)
+
+createTypeVar :: String -> String -> Symbolic SData
+createTypeVar typeName = do
   let sxVarCreator = lookup typeName sxVarCreators
   case sxVarCreator of
     (Just sxVarCreator) -> sxVarCreator
@@ -88,7 +97,7 @@ toSData fs args (NApp name _) = do
   (NFun _ _ (NSieve n t cond)) <- case lookup name fs of
     Just f -> pure f
     Nothing -> error $ "not find function: " <> name
-  fnVar <- createType t n
+  fnVar <- createTypeVar t n
   (SDBool cond', _) <- toSData fs [(n, fnVar)] cond
   pure (fnVar, [cond'])
 
