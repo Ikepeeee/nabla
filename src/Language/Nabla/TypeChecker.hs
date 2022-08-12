@@ -6,6 +6,7 @@ import Language.Nabla.AST
 import Control.Monad (when)
 import Data.Functor (($>))
 import Debug.Trace
+import Language.Nabla.Fixture
 
 show' :: Show a => a -> a
 show' a = traceShow a a
@@ -60,10 +61,10 @@ inferValue funs args (NIte c a b) = do
   pure aType
 inferValue funs args (NFixtureApp name vs) = do
   vTypes <- mapM (inferValue funs args) vs
-  (_, _, retType) <- find' ("not found fixture function: " <> name <> " with argument type " <> show vTypes)
-    (\(name', argTypes, _) -> name' == name && argTypes == vTypes)
+  f <- find' ("not found fixture function: " <> name <> " with argument type " <> show vTypes)
+    (\f -> funName f == name && argTypes f == vTypes)
     fixtureFunTypes
-  pure retType
+  pure $ retType f
 inferValue funs args (NApp name vs) = do
   vTypes <- mapM (inferValue funs args) vs
   (_, _, retType) <- find' ("not found function: " <> name <> " with argument type " <> show vTypes)
@@ -80,27 +81,3 @@ lookup' :: Eq a => e -> a -> [(a, b)] -> Either e b
 lookup' e a vs = case lookup a vs of
   Just b -> Right b
   Nothing -> Left e
-
-fixtureFunTypes :: [FunType]
-fixtureFunTypes =
-  [ ("+", ["Double", "Double"], "Double")
-  , ("+", ["String", "String"], "String")
-  , ("-", ["Double", "Double"], "Double")
-  , ("*", ["Double", "Double"], "Double")
-  , ("/", ["Double", "Double"], "Double")
-  , ("&&", ["Bool", "Bool"], "Bool")
-  , ("||", ["Bool", "Bool"], "Bool")
-  , ("<=", ["Double", "Double"], "Bool")
-  , ("<", ["Double", "Double"], "Bool")
-  , (">=", ["Double", "Double"], "Bool")
-  , (">", ["Double", "Double"], "Bool")
-  , ("==", ["Double", "Double"], "Bool")
-  , ("==", ["String", "String"], "Bool")
-  , ("==", ["Bool", "Bool"], "Bool")
-  , ("/=", ["Double", "Double"], "Bool")
-  , ("/=", ["String", "String"], "Bool")
-  , ("/=", ["Bool", "Bool"], "Bool")
-  , ("~=", ["String", "Regex"], "Bool")
-  , ("!", ["Bool"], "Bool")
-  , ("-", ["Double"], "Double")
-  ]
